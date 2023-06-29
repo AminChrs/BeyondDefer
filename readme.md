@@ -1,6 +1,7 @@
-readme_content = '''# Project Name - Installation Guide
+readme_content = '''
+# Beyond Defer - Installation Guide
 
-This README file provides instructions on how to install and build the **Project Name** using CMake.
+This README file provides instructions on how to install and build the **Beyond Defer** using CMake.
 
 ## Prerequisites
 
@@ -11,7 +12,7 @@ Before proceeding with the installation, ensure that you have the following prer
 
 ## Installation Steps
 
-Follow the steps below to install and build the **Project Name**:
+Follow the steps below to install and build the **Beyond Defer**:
 
 1. Clone the project repository from GitHub:
 git clone <repository_url>

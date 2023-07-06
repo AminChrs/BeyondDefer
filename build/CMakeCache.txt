@@ -361,4 +361,17 @@ CMAKE_STRIP-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Details about finding Python3
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/opt/homebrew/Frameworks/Python.framework/Versions/3.11/bin/python3.11][/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/include/python3.11][/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib][cfound components: Interpreter Development Development.Module Development.Embed ][v3.11.3()]
+_Python3_DEVELOPMENT_EMBED_SIGNATURE:INTERNAL=74bd62af689c7cfaaa6c9cad5d59804c
+_Python3_DEVELOPMENT_MODULE_SIGNATURE:INTERNAL=efa56a65491bcbdceb3cf72075db8454
+//Path to a program.
+_Python3_EXECUTABLE:INTERNAL=/opt/homebrew/Frameworks/Python.framework/Versions/3.11/bin/python3.11
+//Path to a file.
+_Python3_INCLUDE_DIR:INTERNAL=/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/include/python3.11
+//Python3 Properties
+_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;11;3;64;;cpython-311-darwin;/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/lib/python3.11;/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/lib/python3.11;/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages;/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages
+_Python3_INTERPRETER_SIGNATURE:INTERNAL=bc0eef719d06625da6d891c3ac23f4b1
+//Path to a library.
+_Python3_LIBRARY_RELEASE:INTERNAL=/opt/homebrew/opt/python@3.11/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib
 

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 # Check if Python is installed
+find_package (Python3 COMPONENTS Interpreter)
 find_program(PYTHON_EXECUTABLE python)
 if(NOT PYTHON_EXECUTABLE)
     message(FATAL_ERROR "Python is not installed. Please install Python and try again.")
@@ -11,7 +12,7 @@ set(PROJECT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # Create a virtual environment
 execute_process(
-    COMMAND ${PYTHON_EXECUTABLE} -m venv myvenv
+    COMMAND ${PYTHON_EXECUTABLE} -m venv beyond_defer_venv
     WORKING_DIRECTORY ${PROJECT_DIRECTORY}
     RESULT_VARIABLE result
 )
@@ -20,20 +21,23 @@ execute_process(
 if (result)
     message(FATAL_ERROR "Failed to create a virtual environment.")
 endif()
+
+
 # Activate the virtual environment
 if(WIN32)
-    set(vfolder "myenv\\Scripts\\")
+    set(vfolder "beyond_defer_venv\\Scripts\\")
 else()
-    set(vfolder "./myenv/bin/")
+    set(vfolder "$ENV{HOME}/beyond_defer_venv/bin/")
 endif()
-# change directory to vfolder
-execute_process()
-message(STATUS "result of activation: ${result}")
+set(ENV{VIRTUAL_ENV} vfolder)
+set (Python3_FIND_VIRTUALENV FIRST)
+unset (Python3_EXECUTABLE)
+find_package (Python3 COMPONENTS Interpreter Development)
 
 # Install dependencies from requirements.txt
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/requirements.txt requirements.txt
-    COMMAND pip install -r requirements.txt
+    COMMAND $ENV{HOME}/beyond_defer_venv/bin/pip install -r requirements.txt
     RESULT_VARIABLE result
 )
 # print results
@@ -44,18 +48,3 @@ if(result)
     message(FATAL_ERROR "Failed to install dependencies from requirements.txt.")
 endif()
 
-# Deactivate the virtual environment
-if(WIN32)
-    set(deactivate_command "myenv\\Scripts\\deactivate.bat")
-else()
-    set(deactivate_command "deactivate")
-endif()
-
-execute_process(
-    COMMAND ${activate_command} && ${deactivate_command}
-    WORKING_DIRECTORY ${PROJECT_DIRECTORY}
-    RESULT_VARIABLE result
-)
-if(result)
-    message(FATAL_ERROR "Failed to deactivate the virtual environment.")
-endif()

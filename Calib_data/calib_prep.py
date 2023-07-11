@@ -20,9 +20,9 @@ class data_prep:
         df = haiid.load_dataset("./")
         # get specified task data
         task_df = haiid.load_task(df, self.task_name)
-        if self.task_name =='census':
+        if self.task_name == 'census':
             self.task_data = self.preprocess_data(task_df, '>=50k')
-        elif self.task_name =='sarcasm':
+        elif self.task_name == 'sarcasm':
             self.task_data = self.preprocess_data(task_df, 'sarcasm')
         else:
             self.task_data  = self.preprocess_data(task_df)

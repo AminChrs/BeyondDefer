@@ -8,10 +8,12 @@ import numpy as np
 # import matplotlib.pyplot as plt
 # import seaborn as sns
 
-class data_prep:
+class data_prep():
 
-    def _init_(self, name):
+    def __init__(self, name):
         self.task_name = name
+        data = self.set_task_data()
+        self.train, self.test = self.test_train(data, 0.2)
 
 
     def set_task_data(self):
@@ -27,7 +29,7 @@ class data_prep:
         else:
             self.task_data  = self.preprocess_data(task_df)
         
-        self.discretize_human_estimates()
+        # self.discretize_human_estimates()
 
         return (self.task_data)
 
@@ -56,4 +58,28 @@ class data_prep:
         df.loc[df['y']==0,['b', 'h', 'h+AI']] = 1 - df.loc[df['y']==0,['b','h','h+AI']]
 
         return(df[['task_instance_id','participant_id','h','b','y','h+AI']])
+
+    # divide the data into train and test set randomly
+    def test_train(self, data, prop):
+
+        df = data
+        
+        # find the size of df
+        size_all = df['task_instance_id'].nunique()
+
+        # find the number of test data
+        size_test = int(size_all * prop)
+
+        # find the number of train data
+        size_train = size_all - size_test
+
+        # In the following, I assume that there is no multiple annotated data
+
+        # set test data
+        test = df.sample(n=size_test, random_state=1)
+
+        # set train data
+        train = df.drop(test.index)
+
+        return (train, test)
 

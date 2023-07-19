@@ -1,0 +1,14 @@
+__pycache__/
+Data/
+Models/
+*.swp
+.nfs*
+*.out
+*.sw*
+*.zip
+*.pkl
+*.pt
+Galaxy-Zoo/
+HAM10000/
+Hatespeech_old/
+Hatespeech/models

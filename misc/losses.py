@@ -39,7 +39,7 @@ class Criterion(object):
 		return torch.mean(l)
 	def comb_ova(self, outputs_classifier, outputs_sim, outputs_meta, m, labels, n_classes):
 		'''
-		The L_{CE} loss implementation for CIFAR
+		The L_{comb} loss implementation.
 		----
 		outputs: network outputs
 		m: human label

@@ -18,9 +18,10 @@ import torchvision.datasets as datasets
 from torch.autograd import Variable
 import json
 import sys
+sys.path.append('../misc')
 import csv 
 from losses import Criterion
-sys.path.append('../misc')
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 cifar_classes = ('plane', 'car', 'bird', 'cat',
@@ -791,8 +792,8 @@ def train_reject_joint(train_loader, model_ai, model_meta, model_human, optimize
         
         # human output
         output_human = model_human(input)
-        
-        loss = Criterion.comb_ova(output_ai, output_human, output_meta,
+        crit = Criterion()
+        loss = crit.comb_ova(output_ai, output_human, output_meta,
                                   m, target, n_classes)
         
         

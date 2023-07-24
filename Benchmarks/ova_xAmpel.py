@@ -4,10 +4,12 @@
 # the loss function defined in OvA package
 
 import sys
-from losses import comb_ova, ova, softmax
+sys.path.append('../misc')
+from losses import Criterion
 import numpy as np
 import torch as pt
-sys.path.append('../misc')
+
+
 
 def permute(X, Y, M):
     perm = np.random.permutation(X.shape[0])
@@ -56,6 +58,7 @@ for epoch in range(epochs):
         outputs_classifier = classifier(x)
         outputs_simulator = simulator(x)
         meta_outputs = meta_classifier(pt.cat((x, m), dim=1))
+        comb_ova = Criterion().comb_ova
         loss = comb_ova(outputs_classifier, simulator(x), meta_classifier(pt.cat((outputs_classifier, simulator(x)), dim=1)), m, y, 2)
         loss.backward()
         optimizer.step()

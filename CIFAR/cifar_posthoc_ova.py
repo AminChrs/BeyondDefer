@@ -392,7 +392,7 @@ def metrics_print_human(model, data_loader, expert_fn, k_list, verbose = True):
         for data in data_loader:
             images, labels = data
             images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
+            outputs = F.softmax(model(images))
             m = expert_fn(input, labels)
             m = torch.tensor(m)
             m = m.to(device)

@@ -49,7 +49,7 @@ class Criterion(object):
 		outputs_meta: output of the meta classifier
 		n_classes: number of classes
 		'''
-		batch_size = outputs_classifier.size()[0]  # batch_size
+		# batch_size = outputs_classifier.size()[0]  # batch_size
 		l1 = Criterion.LogisticLoss(outputs_classifier[:, labels], 1)
 		l2 = torch.sum(Criterion.LogisticLoss(outputs_classifier[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_classifier[:,labels],-1)
 		l3 = Criterion.LogisticLoss(outputs_meta[:, labels], 1)

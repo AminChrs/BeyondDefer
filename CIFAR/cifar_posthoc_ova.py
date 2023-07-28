@@ -140,9 +140,8 @@ class MetaNet(nn.Module):
     def __init__(self, n_classes, pretrained_model):
         super(MetaNet, self).__init__()
         self.pretrained = pretrained_model
-        self.softmax = nn.Softmax()
         # removing the last layer (1000 out)
-        self.pretrained = nn.Sequential(*list(self.pretrained.children())[:-2])
+        self.pretrained = nn.Sequential(*list(self.pretrained.children())[:-1])
 
         self.added_layers = nn.Sequential(nn.Linear(256 + n_classes,100),
                                           nn.ReLU(),
@@ -151,7 +150,6 @@ class MetaNet(nn.Module):
     def forward(self, x, m):
         x = self.pretrained(x)
         x = F.avg_pool2d(x, 8)
-        x = self.softmax(x)
         x = x.view(-1, 256)
         #print(x.size())
         if type(m) == list:

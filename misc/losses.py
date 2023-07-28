@@ -50,12 +50,12 @@ class Criterion(object):
 		n_classes: number of classes
 		'''
 		batch_size = outputs_classifier.size()[0]  # batch_size
-		l1 = Criterion.LogisticLoss(outputs_classifier[range(batch_size), labels], 1)
-		l2 = torch.sum(Criterion.LogisticLoss(outputs_classifier[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_classifier[range(batch_size),labels],-1)
-		l3 = Criterion.LogisticLoss(outputs_meta[range(batch_size), labels], 1)
-		l4 = torch.sum(Criterion.LogisticLoss(outputs_meta[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_meta[range(batch_size),labels],-1)
-		l5 = Criterion.LogisticLoss(outputs_sim[range(batch_size), m], 1)
-		l6 = torch.sum(Criterion.LogisticLoss(outputs_sim[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_sim[range(batch_size),m],-1)
+		l1 = Criterion.LogisticLoss(outputs_classifier[:, labels], 1)
+		l2 = torch.sum(Criterion.LogisticLoss(outputs_classifier[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_classifier[:,labels],-1)
+		l3 = Criterion.LogisticLoss(outputs_meta[:, labels], 1)
+		l4 = torch.sum(Criterion.LogisticLoss(outputs_meta[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_meta[:,labels],-1)
+		l5 = Criterion.LogisticLoss(outputs_sim[:, m], 1)
+		l6 = torch.sum(Criterion.LogisticLoss(outputs_sim[:,:n_classes], -1), dim=1) - Criterion.LogisticLoss(outputs_sim[:,m],-1)
 		l = l1 + l2 + l3 + l4 + l5 + l6
 		return torch.mean(l)
 

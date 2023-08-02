@@ -390,7 +390,7 @@ def metrics_print_human(model, data_loader, expert_fn, k_list, verbose = True):
         for data in data_loader:
             images, labels = data
             images, labels = images.to(device), labels.to(device)
-            outputs = F.softmax(model(images))
+            outputs = F.sigmoid(model(images))
             m = expert_fn(input, labels)
             m = torch.tensor(m)
             m = m.to(device)
@@ -457,9 +457,9 @@ def metrics_print_posthoc(model_human, model_ai, model_joint, data_loader, exper
             one_hot_m[torch.arange(images.size()[0]), m] = 1
             one_hot_m = one_hot_m.to(device)
 
-            outputs_human = model_human(images)
-            outputs_ai = model_ai(images)
-            outputs_joint = model_joint(images, one_hot_m)
+            outputs_human = F.sigmoid(model_human(images))
+            outputs_ai = F.sigmoid(model_ai(images))
+            outputs_joint = F.sigmoid(model_joint(images, one_hot_m))
 
             #_, predictions_human = torch.max(outputs_human.data, 1) 
             prob_ai , predictions_ai = torch.max(outputs_ai.data, 1) 
@@ -471,7 +471,7 @@ def metrics_print_posthoc(model_human, model_ai, model_joint, data_loader, exper
                 one_hot_j[:, j] = 1
                 one_hot_j = one_hot_j.to(device)
 
-                outputs_joint_j = model_joint(images, one_hot_j)
+                outputs_joint_j = F.sigmoid(model_joint(images, one_hot_j))
                 prob_joint_j, _ = torch.max(outputs_joint_j.data, 1)
                 prob_posthoc += outputs_human[:,j] * prob_joint_j
 
@@ -996,14 +996,14 @@ def main():
     if (is_defer):
         print(f"\n\n----------- Training the deferral with alpha = {alpha} ----------\n\n")
         model_deferral = WideResNet(10, n_dataset + 1, 4, dropRate=0).to(device) # fancy
-        run_reject(model_deferral, n_dataset, expert.predict, 200, alpha, train_loader, val_loader, cost, cost_list) # train for 200 epochs
+        #run_reject(model_deferral, n_dataset, expert.predict, 200, alpha, train_loader, val_loader, cost, cost_list) # train for 200 epochs
 
         print("\n\n----------- Printing the metrics of the deferral ----------\n\n")
         metrics_deferral, class_accuracies_deferral = metrics_print(model_deferral, expert.predict, n_dataset, val_loader)
         results['deferral'] = {'metrics': metrics_deferral, 'class accuracies': class_accuracies_deferral}
     if (not is_defer):
          ## human
-        print(f"\n\n----------- Training the all classifiers jointly ----------\n\n")
+        print(f"\n\n----------- Training all the classifiers jointly ----------\n\n")
         model_human = WideResNet(10, n_dataset, 4, dropRate=0).to(device) 
         model_meta = MetaNet(10, WideResNet(10, n_dataset + 1, 4, dropRate=0))
         model_ai = WideResNet(10, n_dataset + 1, 4, dropRate=0).to(device) 

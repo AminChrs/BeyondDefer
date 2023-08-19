@@ -411,3 +411,79 @@ def mobilenet_v2(pretrained=False, progress=True, device="cpu", **kwargs):
         )
         model.load_state_dict(state_dict)
     return model
+
+# Here I make sure that after a pretrained model, I use N layers of convolution
+# Plus K layers of linear and afterwards, I concatenate the output with the
+# input from human and do P layers of linear. Then, I will make sure that 
+# the dimensions of all these layers are notified, and set in a default manner
+# in the initialization of the model. 
+
+class MetaNet(nn.Module):
+    def __init__(self, n_classes, pretrained_model, dim_last_layer,
+                 n_conv_layers = 0, 
+                 n_linear_layers = 2,
+                 n_linear_layers_after_concat = 1,
+                 kernel_sizes_conv = [], width_linear = [], 
+                 width_linear_after_concat = []):
+        super(MetaNet, self).__init__()
+        self.pretrained = pretrained_model
+        self.pretrained = nn.Sequential(*list(self.pretrained.children())[:-1])
+        self.conv_layers = []
+        self.linear_layers = []
+        self.linear_layers_after_concat = []
+        for i in range(n_conv_layers):
+            if i == 0:
+                self.conv_layers.append(nn.Conv2d(dim_last_layer[0], dim_last_layer[0], kernel_sizes_conv[i]))
+                shape_last = ((dim_last_layer[1:] - kernel_sizes_conv[i]) / 2) + 1
+            else:
+                self.conv_layers.append(nn.Conv2d(dim_last_layer[0], dim_last_layer[0], kernel_sizes_conv[i]))
+                shape_last = ((shape_last - kernel_sizes_conv[i]) / 2) + 1
+        for i in range(n_linear_layers):
+            if i == 0:
+                self.linear_first_size = shape_last[0] * shape_last[1] * dim_last_layer[0]
+                self.linear_layers.append(nn.Linear(self.linear_first_size, width_linear[i]))
+            else:
+                self.linear_layers.append(nn.Linear(width_linear[i-1], width_linear[i]))
+        for i in range(n_linear_layers_after_concat):
+            if i == 0:
+                self.add_layers_after_concat.append(
+                    nn.Sequential(
+                        nn.Linear(n_classes + width_linear[-1], width_linear_after_concat[i]),
+                        nn.ReLU()
+                    )
+                )
+            elif i!= n_linear_layers_after_concat - 1:
+                self.add_layers_after_concat.append(
+                    nn.Sequential(
+                        nn.Linear(width_linear_after_concat[i-1], width_linear_after_concat[i]),
+                        nn.ReLU()
+                    )
+                )
+            else:
+                self.add_layers_after_concat.append(
+                        nn.Linear(width_linear_after_concat[i], n_classes)
+                )
+
+
+        self.added_layers = nn.Sequential(nn.Linear(256 + n_classes,100),
+                                          nn.ReLU(),
+                                          nn.Linear(100, n_classes))
+        
+    def forward(self, x, m):
+        x = self.pretrained(x)
+        x = F.avg_pool2d(x, 8)
+        for l in self.conv_layers:
+            x = l(x)
+            x = F.relu(x)
+        x = x.view(-1, self.linear_first_size)
+        for l in self.linear_layers:
+            x = l(x)
+            x = F.relu(x)
+        if type(m) == list:
+          one_hot_m = torch.zeros(len(m), 10)
+          one_hot_m[torch.arange(len(m)), torch.tensor(m).long()] = 1
+          m = one_hot_m.to(device)
+        x = torch.cat((x, m), dim=1)
+        for l in self.add_layers_after_concat:
+            x = l(x)
+        return x

@@ -4,3 +4,5 @@
 # The threshold is found via a grid search in validation set
 
 
+# First, I define a class similar to Mozannar's that has fit and test
+from human_ai_deferral/basemethod import BaseMethod, BaseSurrogateMethod

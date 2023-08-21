@@ -141,7 +141,7 @@ class MetaNet(nn.Module):
         super(MetaNet, self).__init__()
         self.pretrained = pretrained_model
         # removing the last layer (1000 out)
-        self.pretrained = nn.Sequential(*list(self.pretrained.children())[:-1])
+        self.pretrained = nn.Sequential(*list(self.pretrained.children())[:-2])
 
         self.added_layers = nn.Sequential(nn.Linear(256 + n_classes,100),
                                           nn.ReLU(),

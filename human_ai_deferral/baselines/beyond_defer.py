@@ -101,6 +101,7 @@ class BeyondDefer(BaseSurrogateMethod):
             hum_preds = hum_preds.to(self.device)
             
             # TODO: Check if hum_preds is one-hot or not (probably not)
+            print("shape of hum_preds: ", hum_preds.shape)
             # Convert to one-hot
             
             one_hot_m = torch.zeros((data_x.size()[0], n_classes))

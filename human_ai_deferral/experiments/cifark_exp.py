@@ -4,6 +4,9 @@ import pickle
 import sys
 import torch
 import torch.optim as optim
+# don't show warnings message
+import warnings
+warnings.filterwarnings("ignore")
 
 sys.path.append("../")
 import sys
@@ -29,6 +32,7 @@ from baselines.lce_surrogate import *
 from baselines.mix_of_exps import *
 from baselines.one_v_all import *
 from baselines.selective_prediction import *
+from baselines.beyond_defer import *
 from datasetsdefer.broward import *
 from datasetsdefer.chestxray import *
 from datasetsdefer.cifar_h import *
@@ -42,6 +46,7 @@ from methods.realizable_surrogate import *
 from networks.cnn import *
 import datetime
 from networks.cnn import NetSimple
+from networks.cnn import MetaNet
 
 def main():
 
@@ -65,7 +70,7 @@ def main():
     scheduler = None
     lr = 0.001
     max_trials = 10
-    total_epochs = 50
+    total_epochs = 1
 
 
     errors_lce = []
@@ -75,6 +80,7 @@ def main():
     errors_compare_confidence = []
     errors_differentiable_triage = []
     errors_mixofexps = []
+    errors_beyond_defer = []
     for trial in range(max_trials):
         errors_lce_trial = []
         errors_rs_trial = []
@@ -83,123 +89,142 @@ def main():
         errors_compare_confidence_trial = []
         errors_differentiable_triage_trial = []
         errors_mixofexps_trial = []
+        errors_beyond_defer_trial = []
         for expert_k in ks:
             # generate data
             dataset = CifarSynthDataset(expert_k, False, batch_size=512)
+            if 1 == 0:
+                model = NetSimple(11, 50, 50, 100, 20).to(device)
+                RS = RealizableSurrogate(1, 300, model, device, True)
+                RS.fit_hyperparam(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                rs_metrics = compute_deferral_metrics(RS.test(dataset.data_test_loader))
 
-            model = NetSimple(11, 50, 50, 100, 20).to(device)
-            RS = RealizableSurrogate(1, 300, model, device, True)
-            RS.fit_hyperparam(
-                dataset.data_train_loader,
-                dataset.data_val_loader,
-                dataset.data_test_loader,
-                epochs=total_epochs,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
-            )
-            rs_metrics = compute_deferral_metrics(RS.test(dataset.data_test_loader))
+                model = NetSimple(11, 50, 50, 100, 20).to(device)
+                mixofexps = MixtureOfExperts(model, device)
+                mixofexps.fit(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                mixofexps_metrics = compute_deferral_metrics(
+                    mixofexps.test(dataset.data_test_loader)
+                )
 
-            model = NetSimple(11, 50, 50, 100, 20).to(device)
-            mixofexps = MixtureOfExperts(model, device)
-            mixofexps.fit(
-                dataset.data_train_loader,
-                dataset.data_val_loader,
-                dataset.data_test_loader,
-                epochs=total_epochs,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
-            )
-            mixofexps_metrics = compute_deferral_metrics(
-                mixofexps.test(dataset.data_test_loader)
-            )
+                model = NetSimple(11, 50, 50, 100, 20).to(device)
+                LCE = LceSurrogate(1, 300, model, device)
+                LCE.fit_hyperparam(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                lce_metrics = compute_deferral_metrics(LCE.test(dataset.data_test_loader))
 
-            model = NetSimple(11, 50, 50, 100, 20).to(device)
-            LCE = LceSurrogate(1, 300, model, device)
-            LCE.fit_hyperparam(
-                dataset.data_train_loader,
-                dataset.data_val_loader,
-                dataset.data_test_loader,
-                epochs=total_epochs,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
-            )
-            lce_metrics = compute_deferral_metrics(LCE.test(dataset.data_test_loader))
+                model_class = NetSimple(10, 50, 50, 100, 20).to(device)
+                model_expert = NetSimple(2, 50, 50, 100, 20).to(device)
+                compareconfidence = CompareConfidence(model_class, model_expert, device)
+                compareconfidence.fit(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                compare_metrics = compute_deferral_metrics(
+                    compareconfidence.test(dataset.data_test_loader)
+                )
 
+                model = NetSimple(11, 50, 50, 100, 20).to(device)
+                OVA = OVASurrogate(1, 300, model, device)
+                OVA.fit(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                ova_metrics = compute_deferral_metrics(OVA.test(dataset.data_test_loader))
+
+                model = NetSimple(10, 50, 50, 100, 20).to(device)
+                SP = SelectivePrediction(model, device)
+                SP.fit(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                sp_metrics = compute_deferral_metrics(SP.test(dataset.data_test_loader))
+
+                model_class = NetSimple(10, 50, 50, 100, 20).to(device)
+                model_rejector = NetSimple(2, 50, 50, 100, 20).to(device)
+                diff_triage = DifferentiableTriage(
+                    model_class, model_rejector, device, 0.000, "human_error"
+                )
+                diff_triage.fit(
+                    dataset.data_train_loader,
+                    dataset.data_val_loader,
+                    dataset.data_test_loader,
+                    epochs=total_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    lr=lr,
+                    verbose=False,
+                    test_interval=10,
+                )
+                diff_triage_metrics = compute_deferral_metrics(
+                    diff_triage.test(dataset.data_test_loader)
+                )
+
+            model_human = NetSimple(10, 50, 50, 100, 20).to(device)
             model_class = NetSimple(10, 50, 50, 100, 20).to(device)
-            model_expert = NetSimple(2, 50, 50, 100, 20).to(device)
-            compareconfidence = CompareConfidence(model_class, model_expert, device)
-            compareconfidence.fit(
+            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 10, 1]).to(device)
+            BD = BeyondDefer(10, model_class, model_human, model_meta, device)
+            BD.fit(
                 dataset.data_train_loader,
                 dataset.data_val_loader,
                 dataset.data_test_loader,
+                10,
                 epochs=total_epochs,
                 optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
+                lr = lr,
+                scheduler= scheduler
             )
-            compare_metrics = compute_deferral_metrics(
-                compareconfidence.test(dataset.data_test_loader)
-            )
-
-            model = NetSimple(11, 50, 50, 100, 20).to(device)
-            OVA = OVASurrogate(1, 300, model, device)
-            OVA.fit(
-                dataset.data_train_loader,
-                dataset.data_val_loader,
-                dataset.data_test_loader,
-                epochs=total_epochs,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
-            )
-            ova_metrics = compute_deferral_metrics(OVA.test(dataset.data_test_loader))
-
-            model = NetSimple(10, 50, 50, 100, 20).to(device)
-            SP = SelectivePrediction(model, device)
-            SP.fit(
-                dataset.data_train_loader,
-                dataset.data_val_loader,
-                dataset.data_test_loader,
-                epochs=total_epochs,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
-            )
-            sp_metrics = compute_deferral_metrics(SP.test(dataset.data_test_loader))
-
-            model_class = NetSimple(10, 50, 50, 100, 20).to(device)
-            model_rejector = NetSimple(2, 50, 50, 100, 20).to(device)
-            diff_triage = DifferentiableTriage(
-                model_class, model_rejector, device, 0.000, "human_error"
-            )
-            diff_triage.fit(
-                dataset.data_train_loader,
-                dataset.data_val_loader,
-                dataset.data_test_loader,
-                epochs=total_epochs,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                lr=lr,
-                verbose=False,
-                test_interval=10,
-            )
-            diff_triage_metrics = compute_deferral_metrics(
-                diff_triage.test(dataset.data_test_loader)
+            bd_metrics = compute_deferral_metrics(
+                BD.test(dataset.data_test_loader)
             )
 
             errors_mixofexps_trial.append(mixofexps_metrics)
@@ -209,6 +234,7 @@ def main():
             errors_selective_trial.append(sp_metrics)
             errors_compare_confidence_trial.append(compare_metrics)
             errors_differentiable_triage_trial.append(diff_triage_metrics)
+            errors_beyond_defer_trial.append(bd_metrics)
         errors_lce.append(errors_lce_trial)
         errors_rs.append(errors_rs_trial)
         errors_one_v_all.append(errors_one_v_all_trial)
@@ -216,6 +242,7 @@ def main():
         errors_compare_confidence.append(errors_compare_confidence_trial)
         errors_differentiable_triage.append(errors_differentiable_triage_trial)
         errors_mixofexps.append(errors_mixofexps_trial)
+        errors_beyond_defer.append(errors_beyond_defer_trial)
         all_data = {
             "max_trials": max_trials,
             "ks": ks,
@@ -226,6 +253,7 @@ def main():
             "selective": errors_selective,
             "compare_confidence": errors_compare_confidence,
             "differentiable_triage": errors_differentiable_triage,
+            "beyond_defer": errors_beyond_defer,
         }
         # dump data into pickle file
         with open("../exp_data/data/cifark_exp_" + date_now + ".pkl", "wb") as f:

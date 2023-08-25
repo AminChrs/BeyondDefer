@@ -13,7 +13,7 @@ import sys
 
 import torch
 
-sys.path.append("../")
+sys.path.append("../..")
 import datetime
 
 # allow logging to print everything
@@ -46,7 +46,7 @@ from methods.realizable_surrogate import *
 from networks.cnn import *
 import datetime
 from networks.cnn import NetSimple
-from networks.cnn import MetaNet
+from MyNet.networks import MetaNet
 
 def main():
 
@@ -211,7 +211,9 @@ def main():
 
             model_human = NetSimple(10, 50, 50, 100, 20).to(device)
             model_class = NetSimple(10, 50, 50, 100, 20).to(device)
-            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 10, 1]).to(device)
+            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
             BD = BeyondDefer(10, model_class, model_human, model_meta, device)
             BD.fit(
                 dataset.data_train_loader,

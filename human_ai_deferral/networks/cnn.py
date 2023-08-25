@@ -198,15 +198,10 @@ class NetSimple(nn.Module):
         x = (F.relu(self.conv1(x)))
         x = self.pool(x)
         x = self.pool(F.relu(self.conv2(x)))
-        print("layer 2 shape: ", x.shape)
         x = torch.flatten(x, 1)  # flatten all dimensions except batch
-        print("flattened shape: ", x.shape)
         x = F.relu(self.fc1(x))
-        print("fc1 shape: ", x.shape)
         x = F.relu(self.fc2(x))
-        print("fc2 shape: ", x.shape)
         x = self.fc3(x)
-        print("fc3 shape: ", x.shape)
         return x
 
     def repr(self, x):
@@ -235,101 +230,6 @@ class NetSimpleDefer(nn.Module):
         x = torch.cat((x_h, x_r), 1)
         return x
 
-
-class MetaNet(nn.Module):
-
-    def __init__(self, n_classes, pretrained_model, dim_last_layer,
-                 n_conv_layers = 0, 
-                 n_linear_layers = 0,
-                 n_linear_layers_after_concat = 1,
-                 kernel_sizes_conv = [], width_linear = [], 
-                 width_linear_after_concat = []):
-        super(MetaNet, self).__init__()
-        self.pretrained = pretrained_model
-        self.last_pre = pretrained_model
-        self.pretrained = nn.Sequential(*list(self.pretrained.children())[:-1])
-        self.conv_layers = []
-        self.linear_layers = []
-        self.linear_layers_after_concat = []
-
-        for i in range(n_conv_layers):
-            if i == 0:
-                self.conv_layers.append(nn.Conv2d(dim_last_layer[0], dim_last_layer[0], kernel_sizes_conv[i]))
-                shape_last = ((dim_last_layer[1:] - kernel_sizes_conv[i]) / 2) + 1
-            else:
-                self.conv_layers.append(nn.Conv2d(dim_last_layer[0], dim_last_layer[0], kernel_sizes_conv[i]))
-                shape_last = ((shape_last - kernel_sizes_conv[i]) / 2) + 1
-        if n_conv_layers == 0:
-            shape_last = dim_last_layer[1:]
-        for i in range(n_linear_layers):
-            if i == 0:
-                self.linear_first_size = shape_last[0] * shape_last[1] * dim_last_layer[0]
-                self.linear_layers.append(nn.Linear(self.linear_first_size, width_linear[i]))
-            else:
-                self.linear_layers.append(nn.Linear(width_linear[i-1], width_linear[i]))
-        if n_linear_layers == 0:
-            width_linear = [shape_last[0] * shape_last[1] * dim_last_layer[0]]
-        for i in range(n_linear_layers_after_concat):
-            if i == 0 and i!= n_linear_layers_after_concat - 1:
-                self.linear_layers_after_concat.append(
-                    nn.Sequential(
-                        nn.Linear(n_classes + width_linear[-1],
-                         width_linear_after_concat[i]),
-                        nn.ReLU()
-                    )
-                )
-            elif i!= n_linear_layers_after_concat - 1:
-                self.linear_layers_after_concat.append(
-                    nn.Sequential(
-                        nn.Linear(width_linear_after_concat[i-1], 
-                        width_linear_after_concat[i]),
-                        nn.ReLU()
-                    )
-                )
-            elif i!= 0:
-                self.linear_layers_after_concat.append(
-                        nn.Linear(width_linear_after_concat[i], n_classes)
-                )
-            else:
-                self.linear_layers_after_concat.append(
-                    nn.Sequential(
-                        nn.Linear(n_classes + width_linear[-1], 
-                        n_classes),
-                    )
-                )
-        if n_linear_layers_after_concat == 0:
-            self.added_layers = nn.Linear(n_classes + width_linear[-1], n_classes)
-
-        self.added_layers = nn.Sequential(nn.Linear(256 + n_classes,100),
-                                          nn.ReLU(),
-                                          nn.Linear(100, n_classes))
-        
-    def forward(self, x, m):
-        print("Pretrained:")
-        for i in self.pretrained.modules():
-            print(i)
-        print("Last pretrained:")
-        for i in self.last_pre.modules():
-            print(i)
-        x = self.pretrained(x)
-        print(x.shape)
-        x = F.avg_pool2d(x, 8)
-        for l in self.conv_layers:
-            x = l(x)
-            x = F.relu(x)
-        x = x.view(-1, self.linear_first_size)
-        for l in self.linear_layers:
-            x = l(x)
-            x = F.relu(x)
-        if type(m) == list:
-          one_hot_m = torch.zeros(len(m), 10)
-          one_hot_m[torch.arange(len(m)), torch.tensor(m).long()] = 1
-          m = one_hot_m.to(device)
-        x = torch.cat((x, m), dim=1)
-        for l in self.add_layers_after_concat:
-            x = l(x)
-        return x
-        
 
 class CNNText(nn.Module):
     def __init__(

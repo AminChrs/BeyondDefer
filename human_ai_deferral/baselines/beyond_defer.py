@@ -1,37 +1,31 @@
 import copy
-import math
-from pyexpat import model
 import torch
 import numpy as np
-import torch.nn as nn
 import torch.nn.functional as F
-import argparse
-import os
-import random
-import shutil
 import time
-import torch.utils.data as data
 import sys
-import pickle
 import logging
 from tqdm import tqdm
 
 sys.path.append("..")
-from helpers.utils import *
-from helpers.metrics import *
+from helpers.utils import AverageMeter, accuracy
+from helpers.metrics import compute_metalearner_metrics
 from .basemethod import BaseMethod, BaseSurrogateMethod
 
 eps_cst = 1e-8
 
 
 class BeyondDefer(BaseSurrogateMethod):
-    def __init__(self, plotting_interval, model_classifier, model_sim, model_meta, device, learnable_threshold_rej = False):
+    def __init__(self, plotting_interval, model_classifier,
+                 model_sim, model_meta, device, 
+                 learnable_threshold_rej=False):
         '''
         alpha: hyperparameter for surrogate loss 
         plotting_interval (int): used for plotting model training in fit_epoch
         model (pytorch model): model used for surrogate
         device: cuda device or cpu
-        learnable_threshold_rej (bool): whether to learn a treshold on the reject score (applicable to RealizableSurrogate only)
+        learnable_threshold_rej (bool): whether to learn a treshold on the
+        reject score (applicable to RealizableSurrogate only)
         '''
         self.plotting_interval = plotting_interval
         self.model_classifier = model_classifier
@@ -39,14 +33,16 @@ class BeyondDefer(BaseSurrogateMethod):
         self.model_meta = model_meta
         self.device = device
         self.threshold_rej = 0
-        self.learnable_threshold_rej = learnable_threshold_rej 
-        
+        self.learnable_threshold_rej = learnable_threshold_rej
+
     def LogisticLossOVA(self, outputs, y):
         outputs[torch.where(outputs == 0.0)] = (-1 * y) * (-1 * np.inf)
-        l = torch.log2(1 + torch.exp((-1 * y) * outputs + eps_cst) + eps_cst)
-        return l
+        loss_out = torch.log2(1 + torch.exp((-1 * y) * outputs + eps_cst)
+                                + eps_cst)
+        return loss_out
     
-    def surrogate_loss_function(self, outputs_classifier, outputs_sim, outputs_meta, m, data_y):
+    def surrogate_loss_function(self, outputs_classifier, outputs_sim,
+                                outputs_meta, m, data_y):
         """
         outputs: network outputs
         m: cost of deferring to expert cost of classifier predicting  hum_preds == target
@@ -75,8 +71,8 @@ class BeyondDefer(BaseSurrogateMethod):
 
         return torch.mean(l)
 
-
-    def fit_epoch(self, dataloader, n_classes, optimizer, verbose=False, epoch=1):
+    def fit_epoch(self, dataloader, n_classes, optimizer, verbose=False,
+                  epoch=1):
         """
         Fit the model for one epoch
         model: model to be trained
@@ -101,7 +97,7 @@ class BeyondDefer(BaseSurrogateMethod):
             hum_preds = hum_preds.to(self.device)
             
             # TODO: Check if hum_preds is one-hot or not (probably not)
-            print("shape of hum_preds: ", hum_preds.shape)
+            # print("shape of hum_preds: ", hum_preds.shape)
             # Convert to one-hot
             
             one_hot_m = torch.zeros((data_x.size()[0], n_classes))
@@ -112,12 +108,15 @@ class BeyondDefer(BaseSurrogateMethod):
             outputs_meta = self.model_meta(data_x, one_hot_m)
             outputs_sim = self.model_sim(data_x)
             
-            loss = self.surrogate_loss_function(outputs_classifier, outputs_sim, outputs_meta, hum_preds, data_y)
+            loss = self.surrogate_loss_function(outputs_classifier,
+                                                outputs_sim, outputs_meta,
+                                                hum_preds, data_y)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
-            prec1_classifier = accuracy(outputs_classifier.data, data_y, topk=(1,))[0]
+            prec1_classifier = accuracy(outputs_classifier.data, data_y,
+                                        topk=(1,))[0]
             prec1_meta = accuracy(outputs_meta.data, data_y, topk=(1,))[0]
             prec1_sim = accuracy(outputs_sim.data, hum_preds, topk=(1,))[0]
             losses.update(loss.data.item(), data_x.size(0))
@@ -129,16 +128,18 @@ class BeyondDefer(BaseSurrogateMethod):
             end = time.time()
             if torch.isnan(loss):
                 print("Nan loss")
-                logging.warning(f"NAN LOSS")
+                logging.warning("NAN LOSS")
                 break
             if verbose and batch % self.plotting_interval == 0:
                 logging.info(
                     "Epoch: [{0}][{1}/{2}]\t"
                     "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
                     "Loss {loss.val:.4f} ({loss.avg:.4f})\t"
-                    "Prec@1 Classifier {top1_classifier.val:.3f} ({top1_classifier.avg:.3f})\t"
+                    "Prec@1 Classifier {top1_classifier.val:.3f} \
+                                ({top1_classifier.avg:.3f})\t"
                     "Prec@1 Sim {top1_sim.val:.3f} ({top1_sim.avg:.3f})\t"
-                    "Prec@1 Meta {top1_meta.val:.3f} ({top1_meta.avg:.3f})".format(
+                    "Prec@1 Meta {top1_meta.val:.3f} \
+                                    ({top1_meta.avg:.3f})".format(
                         epoch,
                         batch,
                         len(dataloader),
@@ -149,8 +150,7 @@ class BeyondDefer(BaseSurrogateMethod):
                         top1_meta=top1_meta,
                     )
                 )
-                
-                
+         
     def fit(
         self,
         dataloader_train,
@@ -164,19 +164,23 @@ class BeyondDefer(BaseSurrogateMethod):
         verbose=True,
         test_interval=5,
     ):
-        params = list(self.model_classifier.parameters()) + list(self.model_sim.parameters()) + list(self.model_meta.parameters())
+        params = list(self.model_classifier.parameters()) + \
+                        list(self.model_sim.parameters()) + \
+                        list(self.model_meta.parameters())
         optimizer = optimizer(params, lr=lr)
         if scheduler is not None:
             scheduler = scheduler(optimizer, len(dataloader_train) * epochs)
         best_acc = 0
         
         # store current model dict
-        best_model_classifier = copy.deepcopy(self.model_classifier.state_dict())
+        best_model_classifier = copy.deepcopy(
+                                self.model_classifier.state_dict())
         best_model_sim = copy.deepcopy(self.model_sim.state_dict())
         best_model_meta = copy.deepcopy(self.model_meta.state_dict())
         for epoch in tqdm(range(epochs)):
-            self.fit_epoch(dataloader_train, n_classes, optimizer, verbose, epoch)
-            if epoch % test_interval == 0 and epoch > 1 :
+            self.fit_epoch(dataloader_train, n_classes, optimizer, verbose,
+                           epoch)
+            if epoch % test_interval == 0 and epoch > 1:
                 if self.learnable_threshold_rej:
                     self.fit_treshold_rej(dataloader_val)
                     
@@ -184,9 +188,11 @@ class BeyondDefer(BaseSurrogateMethod):
                 val_metrics = compute_metalearner_metrics(data_test)
                 if val_metrics["system_acc"] >= best_acc:
                     best_acc = val_metrics["system_acc"]
-                    best_model_classifier = copy.deepcopy(self.model_classifier.state_dict())
+                    best_model_classifier = copy.deepcopy(
+                                    self.model_classifier.state_dict())
                     best_model_sim = copy.deepcopy(self.model_sim.state_dict())
-                    best_model_meta = copy.deepcopy(self.model_meta.state_dict())
+                    best_model_meta = copy.deepcopy(
+                                    self.model_meta.state_dict())
                 if verbose:
                     logging.info(compute_metalearner_metrics(data_test))
             if scheduler is not None:
@@ -198,8 +204,7 @@ class BeyondDefer(BaseSurrogateMethod):
             self.fit_treshold_rej(dataloader_val)
         final_test = self.test(dataloader_test, n_classes)
         return compute_metalearner_metrics(final_test)
-    
-    
+
     def test(self, dataloader, n_classes):
         """
         Test the model
@@ -240,11 +245,13 @@ class BeyondDefer(BaseSurrogateMethod):
                     one_hot_j[:, j] = 1
                     one_hot_j = one_hot_j.to(self.device)
 
-                    outputs_meta_j = F.sigmoid(self.model_meta(data_x, one_hot_j), dim=1)
+                    outputs_meta_j = F.sigmoid(self.model_meta(data_x,
+                                                               one_hot_j))
                     prob_meta_j, _ = torch.max(outputs_meta_j.data, 1)
-                    prob_posthoc += outputs_sim[:,j] * prob_meta_j
-                    
+                    prob_posthoc += outputs_sim[:, j] * prob_meta_j
+
                 #rejector = prob_posthoc - cost - prob_ai
+
                 rejector = prob_posthoc - prob_classifier
                 #predictions = pred_classifier * (rejector <= 0) + pred_meta * (rejector > 0)
             
@@ -273,8 +280,6 @@ class BeyondDefer(BaseSurrogateMethod):
             "class_probs": class_probs_all,
         }
         return data
-    
-    
-    
+
 # TODO: Create another network class for meta learner
 # TODO: Check the loss function used to make sure everything is ok

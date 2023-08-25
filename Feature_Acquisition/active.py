@@ -2,33 +2,33 @@
 # Based on which I decide whether to collect the human feature or not
 # Afterwards, I update my belief about the human label and re-train the model
 # The threshold is found via a grid search in validation set
-import copy
 import sys
+sys.path.append("..")
+sys.path.append("../human_ai_deferral")
+import copy
 import torch
-from human_ai_deferral.datasetsdefer import BaseDataset
+from human_ai_deferral.datasetsdefer.basedataset import BaseDataset
 from human_ai_deferral.baselines.basemethod import BaseMethod
 from human_ai_deferral.helpers.utils import AverageMeter, accuracy
 from human_ai_deferral.helpers.metrics import compute_metalearner_metrics
+from human_ai_deferral.helpers.metrics import compute_classification_metrics
 import logging
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import random
 import time
 import numpy as np
-sys.path.append("..", 0)
-sys.path.append("../human_ai_deferral", 0)
 
 
 class IndexedDataset(torch.utils.data.Dataset):
     def __init__(self, dataset):
-        self.dataset = dataset
-        self.length = len(dataset)
+        self.dataset = dataset.data_train_loader.dataset
 
     def __getitem__(self, index):
         return index, self.dataset[index]
 
     def __len__(self):
-        return self.length
+        return len(self.dataset)
 
     def __getattr__(self, attr):
         return getattr(self.dataset, attr)
@@ -37,14 +37,21 @@ class IndexedDataset(torch.utils.data.Dataset):
 class ActiveDataset(BaseDataset):
     def __init__(self, original_dataset):
         self.__dict__ = original_dataset.__dict__.copy()
-        self.mask_labeled = torch.zeros(len(original_dataset.dataset))
-        self.train_dataset = IndexedDataset(self.data_train_loader.dataset)
+        self.train_dataset = IndexedDataset(original_dataset)
+        self.mask_labeled = torch.zeros(len(self.train_dataset.dataset))
         self.labeled_loader = None
 
     def mask(self, idx):
         self.mask_labeled[idx] = 1
 
-    def query(self, criterion, pool_size=100, batch_size=128, query_size=10):
+    def mask_label(self, idx):
+        return self.mask_labeled[idx]
+
+    def generate_data(self):
+        return super().generate_data()
+
+    def Query(self, criterion, pool_size=100, batch_size=128, query_size=10,
+              verbose=False):
         unlabeled_idx = torch.where(self.mask_labeled == 0)[0]
         if (pool_size > 0):
             pool_idx = random.sample(range(1, len(unlabeled_idx)), pool_size)
@@ -60,16 +67,18 @@ class ActiveDataset(BaseDataset):
                                         labeled_idx))
 
         loss, indices = criterion(pool_loader, labeled_loader)
-        # Now order loss in descending order
+
         loss, indices_ordered = torch.sort(loss, descending=True)
         indices_query = indices[indices_ordered[:query_size]]
+        if (indices_query.shape == torch.Size([])):
+            indices_query = torch.tensor([indices_query])
         for i in range(len(indices_query)):
             self.mask(indices_query[i])
         labeled_idx = torch.where(self.mask_labeled == 1)[0]
         self.labeled_loader = DataLoader(self.train_dataset,
-                                            batch_size=batch_size,
-                                            sampler=SubsetRandomSampler(
-                                                labeled_idx))
+                                         batch_size=batch_size,
+                                         sampler=SubsetRandomSampler(
+                                                        labeled_idx))
 
 
 class AFE(BaseMethod):
@@ -79,10 +88,13 @@ class AFE(BaseMethod):
         self.device = device
 
     def AFELoss(self, classifier_pred, meta_pred):
-        # find the KL divergence between the two distributions
-        return torch.nn.functional.kl_div(classifier_pred, meta_pred)
+        classifier_pred = torch.nn.functional.softmax(classifier_pred, dim=1)
+        meta_pred = torch.nn.functional.softmax(meta_pred, dim=1)
+        return torch.sum(classifier_pred * torch.log(classifier_pred /
+                                                     meta_pred))
 
-    def AFELoss_loaders(self, dataloader_labeled, dataloader_unlabeled):
+    def AFELoss_loaders(self, dataloader_labeled, dataloader_unlabeled,
+                        num_classes):
         """ Compute the AFE loss for the whole dataset
         
         dataloader_labeled: dataloader for labeled data
@@ -91,17 +103,32 @@ class AFE(BaseMethod):
         KL_loss = []
         normalizer = []
         indices = []
-        for batch, (indices, data_x, data_y, _) in enumerate(
-                                            dataloader_unlabeled):
+        batch = -1
+        for iters in enumerate(dataloader_unlabeled):
+            if len(iters) == 2:
+                batch = iters[0]
+                indices, (data_x, data_y, _) = iters[1]
+            else:
+                data_x, data_y, _ = iters
+                batch += 1
             batch_size = data_x.size()[0]
             data_x = data_x.to(self.device)
             data_y = data_y.to(self.device)
             output_classifier = self.model_classifier(data_x)
-            for batch_l, (indices_l, data_x_l, _, hum_preds) in enumerate(
-                                                    dataloader_labeled):
+            for iters_in in enumerate(dataloader_labeled):
+                if len(iters_in) == 2:
+                    batch_l, (indices_l, (data_x_l, _, hum_preds)) =\
+                         iters_in
+                else:
+                    data_x_l, _, hum_preds = iters_in
+                    batch_l += 1
                 batch_size_l = data_x.size()[0]
                 data_x_l = data_x.to(self.device)
                 hum_preds = hum_preds.to(self.device)
+                # check whether human predictions are one-hot encoded
+                if len(hum_preds.size()) == batch_l.shape:
+                    hum_preds = torch.nn.functional.one_hot(hum_preds,
+                                                            num_classes)
                 output_meta = self.model_meta(data_x_l, hum_preds)
 
                 for i in range(batch_size):
@@ -137,8 +164,6 @@ class AFE(BaseMethod):
         end = time.time()
         
         self.model_meta.train()
-
-        labeled_idx = torch.where(self.mask_labeled == 1)[0]
 
         for batch, (idx, data_x, data_y, hum_preds) in enumerate(dataloader):
 
@@ -231,6 +256,31 @@ class AFE(BaseMethod):
                     )
                 )
 
+    def fit_Eu(self, epochs, train_loader, test_loader, n_classes,
+               optimizer_meta, verbose=False, test_interval=5,
+               scheduler_meta=None):
+        best_acc = 0
+        best_model_meta = None
+        for epoch in range(epochs):
+            self.fit_Eu_epoch(train_loader,
+                              n_classes,
+                              optimizer_meta,
+                              verbose=verbose,
+                              epoch=epoch)
+
+            if epoch % test_interval == 0:
+                data_test = self.test(test_loader, n_classes)
+                val_metrics = compute_classification_metrics(data_test)
+                if val_metrics["system_acc"] >= best_acc:
+                    best_acc = val_metrics["system_acc"]
+                    best_model_meta = copy.deepcopy(
+                                self.model_classifier.state_dict())
+                if verbose:
+                    logging.info(compute_metalearner_metrics(data_test))
+            if scheduler_meta is not None:
+                scheduler_meta.step()
+            self.model_meta.load_state_dict(best_model_meta)
+
     def fit(self,
             train_loader,
             val_loader,
@@ -272,10 +322,10 @@ class AFE(BaseMethod):
             scheduler_classifier = scheduler_classifier(optimizer_classifier)
         if scheduler_meta is not None:
             scheduler_meta = scheduler_meta(optimizer_meta)
-        
+
         best_acc = 0
         best_model_class = copy.deepcopy(self.model_classifier.state_dict())
-        best_model_meta = copy.deepcopy(self.model_meta.state_dict())
+        # best_model_meta = copy.deepcopy(self.model_meta.state_dict())
         for epoch in range(epochs):
             self.fit_El_epoch(train_loader,
                               n_classes,
@@ -285,13 +335,13 @@ class AFE(BaseMethod):
 
             if epoch % test_interval == 0:
                 data_test = self.test(val_loader, n_classes)
-                val_metrics = compute_metalearner_metrics(data_test)
+                val_metrics = compute_classification_metrics(data_test)
                 if val_metrics["system_acc"] >= best_acc:
                     best_acc = val_metrics["system_acc"]
                     best_model_class = copy.deepcopy(
                                 self.model_classifier.state_dict())
                 if verbose:
-                    logging.info(compute_metalearner_metrics(data_test))
+                    logging.info(compute_classification_metrics(data_test))
             if scheduler_classifier is not None:
                 scheduler_classifier.step()
         self.model_classifier.load_state_dict(best_model_class)
@@ -307,11 +357,24 @@ class AFE(BaseMethod):
 
         # Query
         query_size = 1
+        all_queries = 100
         loader_lu.query(self.AFELoss_loaders, pool_size=0,
                         query_size=query_size)
 
         # train the meta model on the new data
-        for epoch in range(epochs):
+        def Fit_Unlabeled():  self.fit_Eu(epochs, loader_lu, test_loader,
+                                          n_classes,
+                                          optimizer_meta,
+                                          verbose=verbose,
+                                          test_interval=test_interval,
+                                          scheduler_meta=scheduler_meta)
 
-            
+        Fit_Unlabeled()
 
+        for i in range(all_queries):
+            loader_lu.Query(self.AFELoss_loaders, pool_size=0,
+                            query_size=query_size)
+            Fit_Unlabeled()
+
+    def test():
+        return super().test()

@@ -18,6 +18,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import random
 import time
 import numpy as np
+import torch.nn.functional as F
 
 
 class IndexedDataset(torch.utils.data.Dataset):
@@ -61,16 +62,25 @@ class ActiveDataset(BaseDataset):
                                  sampler=SubsetRandomSampler(
                                     unlabeled_idx[pool_idx]))
         labeled_idx = torch.where(self.mask_labeled == 1)[0]
-        labeled_loader = DataLoader(self.train_dataset,
-                                    batch_size=batch_size,
-                                    sampler=SubsetRandomSampler(
-                                        labeled_idx))
+        if (len(labeled_idx) != 0):
+            labeled_loader = DataLoader(self.train_dataset,
+                                        batch_size=batch_size,
+                                        sampler=SubsetRandomSampler(
+                                            labeled_idx))
 
-        loss, indices = criterion(pool_loader, labeled_loader)
+            loss, indices = criterion(pool_loader, labeled_loader)
 
-        loss, indices_ordered = torch.sort(loss, descending=True)
-        indices_query = indices[indices_ordered[:query_size]]
-        if (indices_query.shape == torch.Size([])):
+            loss, indices_ordered = torch.sort(loss, descending=True)
+            indices_ordered = list(indices_ordered.cpu().numpy())
+            indices_query = []
+            for i in indices_ordered[:query_size]:
+                indices_query.append(indices[i])
+        else:
+            idx_random = random.sample(range(1, len(pool_idx)), query_size)
+            indices_query = []
+            for i in idx_random:
+                indices_query.append(pool_idx[i])
+        if (len(indices_query) == 1):
             indices_query = torch.tensor([indices_query])
         for i in range(len(indices_query)):
             self.mask(indices_query[i])
@@ -93,17 +103,18 @@ class AFE(BaseMethod):
         return torch.sum(classifier_pred * torch.log(classifier_pred /
                                                      meta_pred))
 
-    def AFELoss_loaders(self, dataloader_labeled, dataloader_unlabeled,
+    def AFELoss_loaders(self, dataloader_unlabeled, dataloader_labeled,
                         num_classes):
         """ Compute the AFE loss for the whole dataset
-        
+
         dataloader_labeled: dataloader for labeled data
         dataloader_unlabeled: dataloader for unlabeled data
         """
         KL_loss = []
         normalizer = []
-        indices = []
+        indices_tot = []
         batch = -1
+        first_run = True
         for iters in enumerate(dataloader_unlabeled):
             if len(iters) == 2:
                 batch = iters[0]
@@ -119,34 +130,48 @@ class AFE(BaseMethod):
                 if len(iters_in) == 2:
                     batch_l, (indices_l, (data_x_l, _, hum_preds)) =\
                          iters_in
-                else:
+                    indices_tot.append(indices_l)
+                elif len(iters_in) == 3:
                     data_x_l, _, hum_preds = iters_in
                     batch_l += 1
-                batch_size_l = data_x.size()[0]
-                data_x_l = data_x.to(self.device)
+                batch_size_l = data_x_l.size()[0]
+                data_x_l = data_x_l.to(self.device)
                 hum_preds = hum_preds.to(self.device)
                 # check whether human predictions are one-hot encoded
-                if len(hum_preds.size()) == batch_l.shape:
+                if len(hum_preds.shape) == 1:
                     hum_preds = torch.nn.functional.one_hot(hum_preds,
                                                             num_classes)
-                output_meta = self.model_meta(data_x_l, hum_preds)
 
+                output_meta = self.model_meta(data_x_l, hum_preds)
                 for i in range(batch_size):
+                    if first_run:
+                        new_unlabeled_batch = True
                     for j in range(batch_size_l):
-                        if j == 0:
-                            KL_loss.append(self.AFELoss(output_classifier[i],
-                                                        output_meta[j]))
-                            normalizer.append(1)
-                            indices.append(indices[i])
+                        if batch_size != 1:
+                            o1 = output_classifier[i].unsqueeze(0)
                         else:
-                            KL_loss[i] += self.AFELoss(output_classifier[i],
-                                                       output_meta[j])
+                            o1 = output_classifier
+                        if batch_size_l != 1:
+                            o2 = output_meta[j].unsqueeze(0)
+                        else:
+                            o2 = output_meta
+                        if new_unlabeled_batch and j == 0:
+                            KL_loss.append(self.AFELoss(o1, o2))
+                            normalizer.append(1)
+                            indices_tot.append(indices[i])
+                            new_unlabeled_batch = False
+                        else:
+                            KL_loss[i] += self.AFELoss(o1, o2)
                             normalizer[i] += 1
+                if first_run:
+                    first_run = False
+        KL_loss = torch.tensor(KL_loss)
+        normalizer = torch.tensor(normalizer)
         KL_loss /= normalizer
-        return KL_loss, indices
+        return KL_loss, indices_tot
 
     def Loss(self, pred, y):
-        return torch.nn.CrossEntropyLoss(pred, y)
+        return torch.nn.CrossEntropyLoss(reduction='none')(pred, y)
 
     def fit_Eo_epoch(self, dataloader, n_classes, optimizer,
                      verbose=False, epoch=1):
@@ -162,11 +187,9 @@ class AFE(BaseMethod):
         losses = AverageMeter()
         top1 = AverageMeter()
         end = time.time()
-        
+
         self.model_meta.train()
-
-        for batch, (idx, data_x, data_y, hum_preds) in enumerate(dataloader):
-
+        for batch, (idx, (data_x, data_y, hum_preds)) in enumerate(dataloader):
             data_x = data_x.to(self.device)
             data_y = data_y.to(self.device)
             hum_preds = hum_preds.to(self.device)
@@ -175,7 +198,7 @@ class AFE(BaseMethod):
             one_hot_m = one_hot_m.to(self.device)
 
             output_meta = self.model_meta(data_x, one_hot_m)
-            loss = self.Loss(output_meta, data_y)
+            loss = torch.mean(self.Loss(output_meta, data_y))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -190,7 +213,7 @@ class AFE(BaseMethod):
                 print("Nan loss")
                 logging.warning("NAN LOSS")
                 break
-            if verbose and batch % self.plotting_interval == 0:
+            if verbose and batch % 20 == 0:
                 logging.info(
                     "Epoch: [{0}][{1}/{2}]\t"
                     "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
@@ -221,12 +244,12 @@ class AFE(BaseMethod):
 
         self.model_classifier.train()
 
-        for batch, (idx, data_x, data_y, _) in enumerate(dataloader):
+        for batch, (data_x, data_y, _) in enumerate(dataloader):
             data_x = data_x.to(self.device)
             data_y = data_y.to(self.device)
 
             output_classifier = self.model_classifier(data_x)
-            loss = self.Loss(output_classifier, data_y)
+            loss = torch.mean(self.Loss(output_classifier, data_y))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -241,7 +264,7 @@ class AFE(BaseMethod):
                 print("Nan loss")
                 logging.warning("NAN LOSS")
                 break
-            if verbose and batch % self.plotting_interval == 0:
+            if verbose and batch % 20 == 0:
                 logging.info(
                     "Epoch: [{0}][{1}/{2}]\t"
                     "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
@@ -256,25 +279,27 @@ class AFE(BaseMethod):
                     )
                 )
 
-    def fit_Eu(self, epochs, train_loader, test_loader, n_classes,
+    def fit_Eu(self, epochs, Dataset, n_classes,
                optimizer_meta, verbose=False, test_interval=5,
                scheduler_meta=None):
+        train_loader = Dataset.labeled_loader
+        test_loader = Dataset.data_test_loader
         best_acc = 0
-        best_model_meta = None
+        best_model_meta = copy.deepcopy(self.model_meta.state_dict())
         for epoch in range(epochs):
-            self.fit_Eu_epoch(train_loader,
+            self.fit_Eo_epoch(train_loader,
                               n_classes,
                               optimizer_meta,
                               verbose=verbose,
                               epoch=epoch)
 
             if epoch % test_interval == 0:
-                data_test = self.test(test_loader, n_classes)
-                val_metrics = compute_classification_metrics(data_test)
+                data_test = self.test(test_loader)
+                val_metrics = compute_metalearner_metrics(data_test)
                 if val_metrics["system_acc"] >= best_acc:
                     best_acc = val_metrics["system_acc"]
                     best_model_meta = copy.deepcopy(
-                                self.model_classifier.state_dict())
+                                self.model_meta.state_dict())
                 if verbose:
                     logging.info(compute_metalearner_metrics(data_test))
             if scheduler_meta is not None:
@@ -282,18 +307,16 @@ class AFE(BaseMethod):
             self.model_meta.load_state_dict(best_model_meta)
 
     def fit(self,
-            train_loader,
-            val_loader,
-            test_loader,
+            Dataset,
             n_classes,
-            optimizer_classifier,
-            optimizer_meta,
             epochs,
             lr,
             scheduler_classifier=None,
             scheduler_meta=None,
             verbose=False,
-            test_interval=5):
+            test_interval=5,
+            query_size=1,
+            num_queries=100):
 
         """Fit the classifier, then find the KL divergence between each
          unlabeled points and all the labeled ones, and pick the highest
@@ -313,10 +336,14 @@ class AFE(BaseMethod):
         verbose: print loss
         """
 
+        train_loader = Dataset.data_train_loader
+        val_loader = Dataset.data_val_loader
+        test_loader = Dataset.data_test_loader
+
         params_class = list(self.model_classifier.parameters())
         params_meta = list(self.model_meta.parameters())
-        optimizer_classifier = optimizer_classifier(params_class, lr=lr)
-        optimizer_meta = optimizer_meta(params_meta, lr=lr)
+        optimizer_classifier = torch.optim.Adam(params_class, lr=lr)
+        optimizer_meta = torch.optim.Adam(params_meta, lr=lr)
 
         if scheduler_classifier is not None:
             scheduler_classifier = scheduler_classifier(optimizer_classifier)
@@ -334,10 +361,10 @@ class AFE(BaseMethod):
                               epoch=epoch)
 
             if epoch % test_interval == 0:
-                data_test = self.test(val_loader, n_classes)
+                data_test = self.test(val_loader)
                 val_metrics = compute_classification_metrics(data_test)
-                if val_metrics["system_acc"] >= best_acc:
-                    best_acc = val_metrics["system_acc"]
+                if val_metrics["classifier_all_acc"] >= best_acc:
+                    best_acc = val_metrics["classifier_all_acc"]
                     best_model_class = copy.deepcopy(
                                 self.model_classifier.state_dict())
                 if verbose:
@@ -346,23 +373,13 @@ class AFE(BaseMethod):
                 scheduler_classifier.step()
         self.model_classifier.load_state_dict(best_model_class)
 
-        # Next, I make a new dataloader that I add a labeled data after 
-        # acquisition. Then, I find the KL divergence between each unlabeled
-        # and the labeled data, and pick the highest one and add it to the
-        # labeled data. Then, I re-train the meta model on the new data.
 
-        # First choose one point from the train loader and make a new 
-        # dataloader with that one point
-        loader_lu = ActiveDataset(train_loader)
-
-        # Query
-        query_size = 1
-        all_queries = 100
-        loader_lu.query(self.AFELoss_loaders, pool_size=0,
-                        query_size=query_size)
+        def criterion(dataloader1, dataloader2):
+            return self.AFELoss_loaders(dataloader1, dataloader2, n_classes)
+        Dataset.Query(criterion, pool_size=0, query_size=query_size)
 
         # train the meta model on the new data
-        def Fit_Unlabeled():  self.fit_Eu(epochs, loader_lu, test_loader,
+        def Fit_Unlabeled():  self.fit_Eu(epochs, Dataset,
                                           n_classes,
                                           optimizer_meta,
                                           verbose=verbose,
@@ -371,10 +388,51 @@ class AFE(BaseMethod):
 
         Fit_Unlabeled()
 
-        for i in range(all_queries):
-            loader_lu.Query(self.AFELoss_loaders, pool_size=0,
-                            query_size=query_size)
+        for i in range(num_queries):
+            Dataset.Query(criterion, pool_size=0, query_size=query_size)
             Fit_Unlabeled()
 
-    def test():
-        return super().test()
+    def test(self, dataloader):
+        predictions_all = []
+        class_probs_all = []
+        meta_preds_all = []
+        truths_all = []
+        defers_all = []
+        with torch.no_grad():
+            for batch_idx, (data_x, data_y, hum_preds) in enumerate(dataloader):
+                data_x = data_x.to(self.device)
+                data_y = data_y.to(self.device)
+                hum_preds = hum_preds.to(self.device)
+                truths_all.extend(data_y.cpu().numpy())
+
+                output_class = self.model_classifier(data_x)
+                output_class = F.softmax(output_class, dim=1)
+                max_class_probs, predicted_class = \
+                    torch.max(output_class.data, 1)
+                predictions_all.extend(predicted_class.cpu().numpy())
+                class_probs_all.extend(F.softmax(
+                        output_class, dim=1).cpu().numpy())
+
+                hum_preds = F.one_hot(hum_preds, num_classes=10)
+                output_meta = self.model_meta(data_x, hum_preds)
+                output_meta = F.softmax(output_meta, dim=1)
+                max_meta_probs, predicted_meta = \
+                    torch.max(output_meta.data, 1)
+                meta_preds_all.extend(predicted_meta.cpu().numpy())
+
+                len_y = len(data_y)
+                defers_all.extend([1] * len_y)
+
+        predictions_all = np.array(predictions_all)
+        truths_all = np.array(truths_all)
+        class_probs_all = np.array(class_probs_all)
+        meta_preds_all = np.array(meta_preds_all)
+        defers_all = np.array(defers_all)
+        data = {
+            "labels": truths_all,
+            "preds": predictions_all,
+            "class_probs": class_probs_all,
+            "meta_preds": meta_preds_all,
+            "defers": defers_all,
+        }
+        return data

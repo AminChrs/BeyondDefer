@@ -91,6 +91,7 @@ def test_active_query():
         Loss = torch.tensor(Loss)
         return Loss, indices
     Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
+    Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=10)
     assert idx_highest != 0
     assert Dataset_CIFAR_Active.mask_label(idx_highest) == 1
     assert Dataset_CIFAR_Active.mask_label(idx_highest - 1) == 0
@@ -103,7 +104,7 @@ def test_AFE_loss():
     expert_k = 5
     Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
     Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
-    
+
     # Classifier
     Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
     Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
@@ -130,16 +131,21 @@ def test_AFE_loss():
         break
     print("Test AFE Passed!")
 
+
 def test_AFE_loss_loaders():
     # Image
     expert_k = 5
     Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
     Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
 
+    len_1 = 100
+    len_2 = 50
+
     dataset_actual = Dataset_CIFAR_Active.train_dataset
-    # Sample Randomly from the dataset to make a loader
     indices = np.random.choice(len(dataset_actual), 100, replace=False)
     inv_indices = np.setdiff1d(np.arange(len(dataset_actual)), indices)
+    inv_indices = inv_indices[:len_2]
+    indices = indices[:len_1]
     dataset_loader1 = torch.utils.data.DataLoader(
         dataset_actual, batch_size=1,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices))
@@ -154,9 +160,11 @@ def test_AFE_loss_loaders():
 
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
-    print(AFE_CIFAR.AFELoss_loaders(dataset_loader1, dataset_loader2, 10))
-    assert AFE_CIFAR.AFELoss_loaders(dataset_loader1, dataset_loader2, 10).shape == \
-        torch.Size([])
+    KL_loss, indices = AFE_CIFAR.AFELoss_loaders(dataset_loader1,
+                                                 dataset_loader2, 10)
+    assert KL_loss.shape == torch.Size([len_2])
+    assert len(indices) == len_2
+    print("Test AFE Loss Loaders Passed!")
 
 
 def test_Meta_model():
@@ -169,24 +177,133 @@ def test_Meta_model():
     # Classifier
     Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
                    remove_layers=["fc3", "softmax"]).to(device)
-    print(Meta)
 
     for batch, (x, y, m) in enumerate(train_loader):
         x = x.to(device)
         m = m.to(device)
         assert x.shape == torch.Size([512, 3, 32, 32])
         assert y.shape == torch.Size([512])
-        # make m a 1-hot vector
         m = torch.nn.functional.one_hot(m, 10).float()
         assert m.shape == torch.Size([512, 10])
 
         assert Meta(x, m).shape == torch.Size([512, 10])
         break
+    print("Test Meta Model Passed!")
+
+
+def test_AFE_fit_epochs():
+
+    # Image
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+    Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
+
+    # Classifier and Meta
+    Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                   remove_layers=["fc3", "softmax"]).to(device)
+
+    # AFE
+    AFE_CIFAR = AFE(Classifier, Meta, device)
+    optim = torch.optim.Adam(Classifier.parameters(), lr=0.001)
+    optim_meta = torch.optim.Adam(Meta.parameters(), lr=0.001)
+    AFE_CIFAR.fit_Eo_epoch(Dataset_CIFAR_Active.data_train_loader, 10,
+                           optim_meta, verbose=True)
+    AFE_CIFAR.fit_El_epoch(Dataset_CIFAR_Active.data_train_loader, 10, optim,
+                           verbose=True)
+
+    print("Test AFE Fit Classifier Passed!")
+
+
+def test_AFE_CE_loss():
+
+    # Image Dataset
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+    Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
+
+    # Classifier
+    Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                   remove_layers=["fc3", "softmax"]).to(device)
+
+    # AFE
+    AFE_CIFAR = AFE(Classifier, Meta, device)
+
+    # read one batch
+    _, (x, y, _) = next(enumerate(Dataset_CIFAR_Active.data_train_loader))
+    x = x.to(device)
+    y = y.to(device)
+    yhat = Classifier(x)
+    assert yhat.shape == torch.Size([512, 10])
+    assert y.shape == torch.Size([512])
+    assert AFE_CIFAR.Loss(yhat, y).shape == torch.Size([512])
+
+
+def test_AFE_fit_Eu():
+
+    # Image Dataset
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+    Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
+
+    # Classifier
+    Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                   remove_layers=["fc3", "softmax"]).to(device)
+
+    # AFE
+    AFE_CIFAR = AFE(Classifier, Meta, device)
+
+    optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.001)
+
+    def criterion(loader_unlabeled, _):
+        indices = []
+        Loss = []
+        loss_start = 0
+        global idx_highest
+        for batch, (idx, (x, y, m)) in enumerate(loader_unlabeled):
+            for i in idx:
+                indices.append(i)
+                Loss.append(loss_start)
+                loss_start += 0.1
+                idx_highest = i
+        # Convert to tensor
+        Loss = torch.tensor(Loss)
+        return Loss, indices
+    Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
+    Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
+    AFE_CIFAR.fit_Eu(2, Dataset_CIFAR_Active,
+                     10, optimizer_meta, verbose=True)
+    print("Test AFE Fit Eu Passed!")
+
+
+def test_AFE_fit():
+
+    # Image Dataset
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+    Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
+
+    # Classifier
+    Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                   remove_layers=["fc3", "softmax"]).to(device)
+
+    # AFE
+    AFE_CIFAR = AFE(Classifier, Meta, device)
+
+    AFE_CIFAR.fit(Dataset_CIFAR_Active,
+                  10, 1, lr=0.001, verbose=True, query_size=10)
 
 
 # test_indexed()
 # test_active_mask()
-# test_active_query()
+test_active_query()
 # test_Meta_model()
-test_AFE_loss()
-test_AFE_loss_loaders()
+# test_AFE_loss()
+# test_AFE_loss_loaders()
+# test_AFE_CE_loss()
+# test_AFE_fit_epochs()
+# test_AFE_fit_Eu()
+test_AFE_fit()

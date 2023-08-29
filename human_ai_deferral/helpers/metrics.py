@@ -63,10 +63,13 @@ def compute_metalearner_metrics(data_test):
     )
     results["coverage"] = 1 - np.mean(data_test["defers"])
     # get classifier accuracy when defers is 0
-    results["classifier_nondeferred_acc"] = sklearn.metrics.accuracy_score(
-        data_test["preds"][data_test["defers"] == 0],
-        data_test["labels"][data_test["defers"] == 0],
-    )
+    if data_test["defers"].sum() < len(data_test["defers"]):
+        results["classifier_nondeferred_acc"] = sklearn.metrics.accuracy_score(
+            data_test["preds"][data_test["defers"] == 0],
+            data_test["labels"][data_test["defers"] == 0],
+        )
+    else:
+        results["classifier_nondeferred_acc"] = 0
     # get human accuracy when defers is 1
     results["meta_deferred_acc"] = sklearn.metrics.accuracy_score(
         data_test["meta_preds"][data_test["defers"] == 1],

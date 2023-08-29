@@ -19,11 +19,16 @@ import random
 import time
 import numpy as np
 import torch.nn.functional as F
-
+logging.getLogger().setLevel(logging.INFO)
 
 class IndexedDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset):
-        self.dataset = dataset.data_train_loader.dataset
+    def __init__(self, dataset, split="train"):
+        if split == "train":
+            self.dataset = dataset.data_train_loader.dataset
+        elif split == "val":
+            self.dataset = dataset.data_val_loader.dataset
+        elif split == "test":
+            self.dataset = dataset.data_test_loader.dataset
 
     def __getitem__(self, index):
         return index, self.dataset[index]
@@ -39,6 +44,10 @@ class ActiveDataset(BaseDataset):
     def __init__(self, original_dataset):
         self.__dict__ = original_dataset.__dict__.copy()
         self.train_dataset = IndexedDataset(original_dataset)
+        self.val_dataset = IndexedDataset(original_dataset, split="val")
+        self.val_loader = DataLoader(self.val_dataset, batch_size=128)
+        self.test_dataset = IndexedDataset(original_dataset, split="test")
+        self.test_loader = DataLoader(self.test_dataset, batch_size=128)
         self.mask_labeled = torch.zeros(len(self.train_dataset.dataset))
         self.labeled_loader = None
 
@@ -51,16 +60,24 @@ class ActiveDataset(BaseDataset):
     def generate_data(self):
         return super().generate_data()
 
-    def Query(self, criterion, pool_size=100, batch_size=128, query_size=10,
-              verbose=False):
-        unlabeled_idx = torch.where(self.mask_labeled == 0)[0]
-        if (pool_size > 0):
-            pool_idx = random.sample(range(1, len(unlabeled_idx)), pool_size)
-        else:
-            pool_idx = np.arange(len(unlabeled_idx))
-        pool_loader = DataLoader(self.train_dataset, batch_size=batch_size,
-                                 sampler=SubsetRandomSampler(
-                                    unlabeled_idx[pool_idx]))
+    def indices_Query(self, criterion, split="train", pool_size=100,
+                      batch_size=128, query_size=10):
+        if split == "train":
+            unlabeled_idx = torch.where(self.mask_labeled == 0)[0]
+            if (pool_size > 0):
+                pool_idx = random.sample(range(1, len(unlabeled_idx)),
+                                         pool_size)
+            else:
+                pool_idx = np.arange(len(unlabeled_idx))
+            pool_loader = DataLoader(self.train_dataset, batch_size=batch_size,
+                                     sampler=SubsetRandomSampler(
+                                        unlabeled_idx[pool_idx]))
+        elif split == "val":
+            pool_loader = self.val_loader
+            pool_idx = np.arange(0, len(pool_loader.dataset))
+        elif split == "test":
+            pool_loader = self.test_loader
+            pool_idx = np.arange(0, len(pool_loader.dataset))
         labeled_idx = torch.where(self.mask_labeled == 1)[0]
         if (len(labeled_idx) != 0):
             labeled_loader = DataLoader(self.train_dataset,
@@ -76,12 +93,18 @@ class ActiveDataset(BaseDataset):
             for i in indices_ordered[:query_size]:
                 indices_query.append(indices[i])
         else:
-            idx_random = random.sample(range(1, len(pool_idx)), query_size)
+            idx_random = random.sample(range(0, len(pool_idx)), query_size)
             indices_query = []
             for i in idx_random:
                 indices_query.append(pool_idx[i])
         if (len(indices_query) == 1):
             indices_query = torch.tensor([indices_query])
+        return indices_query
+
+    def Query(self, criterion, pool_size=100, batch_size=128, query_size=10,
+              ):
+        indices_query = self.indices_Query(criterion, "train", pool_size,
+                                           batch_size, query_size)
         for i in range(len(indices_query)):
             self.mask(indices_query[i])
         labeled_idx = torch.where(self.mask_labeled == 1)[0]
@@ -90,12 +113,83 @@ class ActiveDataset(BaseDataset):
                                          sampler=SubsetRandomSampler(
                                                         labeled_idx))
 
+    def Query_unnumbered(self, criterion, loss):
+        len_val = len(self.val_dataset)
+        indices_query = self.indices_Query(criterion, query_size=len_val,
+                                           split="val")
+        loss_def = np.zeros(len_val)
+        loss_no_def = np.zeros(len_val)
+        for i in range(len_val):
+            idx, (x, y, hum_pred) = self.val_dataset[indices_query[i]]
+            if i == 0:
+                loss_def[i] = loss(x, hum_pred, y, defer=True)
+                loss_no_def[i] = loss(x, hum_pred, y, defer=False)
+            else:
+                loss_def[i] = loss(x, hum_pred, y, defer=True)
+                loss_no_def[i] = loss(x, hum_pred, y, defer=False)
+
+        loss_cum = []
+        for i in range(len_val):
+            loss_cum.append(np.sum(loss_def[:i])+np.sum(loss_no_def[i:]))
+        loss_cum = loss_cum
+        min_idx = np.argmin(loss_cum)
+        return min_idx, len_val
+
+    def Query_test(self, criterion, loss_criterion, size):
+        len_test = len(self.test_dataset)
+        indices_query = self.indices_Query(criterion, query_size=len_test,
+                                           split="test")
+        loss = 0.0
+        for i in range(size):
+            idx, (x, y, hum_pred) = self.test_dataset[indices_query[i]]
+            assert idx == indices_query[i]
+            loss += loss_criterion(x, hum_pred, y, defer=True)
+        for i in range(size, len_test):
+            idx, (x, y, hum_pred) = self.test_dataset[indices_query[i]]
+            assert idx == indices_query[i]
+            loss += loss_criterion(x, hum_pred, y, defer=False)
+        loss = loss/len_test
+        return loss
+
 
 class AFE(BaseMethod):
     def __init__(self, model_classifier, model_meta, device):
         self.model_classifier = model_classifier
         self.model_meta = model_meta
         self.device = device
+        self.report = []
+
+    def loss_defer(self, x, y, m, defer):
+        c_defer = 0.0
+
+        if isinstance(y, np.int64):
+            y = torch.tensor([y])
+        if isinstance(m, np.int64):
+            m = torch.tensor([m])
+
+        data_x = x.to(self.device).unsqueeze(0)
+        data_y = y.to(self.device)
+        hum_preds = m.to(self.device)
+        hum_preds = F.one_hot(hum_preds, num_classes=10)
+
+        output_class = self.model_classifier(data_x)
+        output_class = F.softmax(output_class, dim=1)
+        _, predicted_class = torch.max(output_class.data, 1)
+
+        output_meta = self.model_meta(data_x, hum_preds)
+        output_meta = F.softmax(output_meta, dim=1)
+        _, predicted_meta = torch.max(output_meta.data, 1)
+
+        if defer:
+            if predicted_meta == data_y:
+                return c_defer
+            else:
+                return c_defer + 1.0
+        else:
+            if predicted_class == data_y:
+                return 0.0
+            else:
+                return 1.0
 
     def AFELoss(self, classifier_pred, meta_pred):
         classifier_pred = torch.nn.functional.softmax(classifier_pred, dim=1)
@@ -114,7 +208,8 @@ class AFE(BaseMethod):
         normalizer = []
         indices_tot = []
         batch = -1
-        first_run = True
+        idxes_so_far = 0
+        batch_l = -1
         for iters in enumerate(dataloader_unlabeled):
             if len(iters) == 2:
                 batch = iters[0]
@@ -126,14 +221,16 @@ class AFE(BaseMethod):
             data_x = data_x.to(self.device)
             data_y = data_y.to(self.device)
             output_classifier = self.model_classifier(data_x)
+
             for iters_in in enumerate(dataloader_labeled):
+
                 if len(iters_in) == 2:
                     batch_l, (indices_l, (data_x_l, _, hum_preds)) =\
                          iters_in
-                    indices_tot.append(indices_l)
                 elif len(iters_in) == 3:
                     data_x_l, _, hum_preds = iters_in
                     batch_l += 1
+
                 batch_size_l = data_x_l.size()[0]
                 data_x_l = data_x_l.to(self.device)
                 hum_preds = hum_preds.to(self.device)
@@ -143,9 +240,9 @@ class AFE(BaseMethod):
                                                             num_classes)
 
                 output_meta = self.model_meta(data_x_l, hum_preds)
+
                 for i in range(batch_size):
-                    if first_run:
-                        new_unlabeled_batch = True
+
                     for j in range(batch_size_l):
                         if batch_size != 1:
                             o1 = output_classifier[i].unsqueeze(0)
@@ -155,16 +252,16 @@ class AFE(BaseMethod):
                             o2 = output_meta[j].unsqueeze(0)
                         else:
                             o2 = output_meta
-                        if new_unlabeled_batch and j == 0:
+                        if batch_l == 0 and j == 0:
                             KL_loss.append(self.AFELoss(o1, o2))
                             normalizer.append(1)
                             indices_tot.append(indices[i])
-                            new_unlabeled_batch = False
                         else:
-                            KL_loss[i] += self.AFELoss(o1, o2)
-                            normalizer[i] += 1
-                if first_run:
-                    first_run = False
+                            KL_loss[idxes_so_far+i] += self.AFELoss(o1, o2)
+                            normalizer[idxes_so_far+i] += 1
+
+            idxes_so_far += batch_size
+
         KL_loss = torch.tensor(KL_loss)
         normalizer = torch.tensor(normalizer)
         KL_loss /= normalizer
@@ -283,7 +380,7 @@ class AFE(BaseMethod):
                optimizer_meta, verbose=False, test_interval=5,
                scheduler_meta=None):
         train_loader = Dataset.labeled_loader
-        test_loader = Dataset.data_test_loader
+        val_loader = Dataset.data_val_loader
         best_acc = 0
         best_model_meta = copy.deepcopy(self.model_meta.state_dict())
         for epoch in range(epochs):
@@ -294,7 +391,7 @@ class AFE(BaseMethod):
                               epoch=epoch)
 
             if epoch % test_interval == 0:
-                data_test = self.test(test_loader)
+                data_test = self.test(val_loader)
                 val_metrics = compute_metalearner_metrics(data_test)
                 if val_metrics["system_acc"] >= best_acc:
                     best_acc = val_metrics["system_acc"]
@@ -391,6 +488,32 @@ class AFE(BaseMethod):
         for i in range(num_queries):
             Dataset.Query(criterion, pool_size=0, query_size=query_size)
             Fit_Unlabeled()
+            self.report_iteration(i, Dataset, n_classes)
+
+    def report_iteration(self, query_num, Dataset, n_classes):
+        report_dict = {}
+        report_dict["query_num"] = query_num
+
+        data_test = self.test(Dataset.data_test_loader)
+        test_metrics_class = compute_classification_metrics(data_test)
+        report_dict["test_metrics_class"] = test_metrics_class
+
+        test_metrics_meta = compute_metalearner_metrics(data_test)
+        report_dict["test_metrics_meta"] = test_metrics_meta
+
+        def criterion(dataloader1, dataloader2):
+            return self.AFELoss_loaders(dataloader1, dataloader2, n_classes)
+
+        min_idx, len_val = Dataset.Query_unnumbered(
+                                        criterion, self.loss_defer)
+        proportion = (min_idx+1)/len_val
+        len_test = len(Dataset.data_test_loader.dataset)
+        defer_size = int(np.floor(proportion*len_test))
+        report_dict["defer_size"] = defer_size
+        report_dict["loss_defer"] = Dataset.Query_test(criterion,
+                                                       self.loss_defer,
+                                                       defer_size)
+        self.report.append(report_dict)
 
     def test(self, dataloader):
         predictions_all = []
@@ -399,7 +522,7 @@ class AFE(BaseMethod):
         truths_all = []
         defers_all = []
         with torch.no_grad():
-            for batch_idx, (data_x, data_y, hum_preds) in enumerate(dataloader):
+            for _, (data_x, data_y, hum_preds) in enumerate(dataloader):
                 data_x = data_x.to(self.device)
                 data_y = data_y.to(self.device)
                 hum_preds = hum_preds.to(self.device)
@@ -407,8 +530,7 @@ class AFE(BaseMethod):
 
                 output_class = self.model_classifier(data_x)
                 output_class = F.softmax(output_class, dim=1)
-                max_class_probs, predicted_class = \
-                    torch.max(output_class.data, 1)
+                _, predicted_class = torch.max(output_class.data, 1)
                 predictions_all.extend(predicted_class.cpu().numpy())
                 class_probs_all.extend(F.softmax(
                         output_class, dim=1).cpu().numpy())
@@ -416,8 +538,7 @@ class AFE(BaseMethod):
                 hum_preds = F.one_hot(hum_preds, num_classes=10)
                 output_meta = self.model_meta(data_x, hum_preds)
                 output_meta = F.softmax(output_meta, dim=1)
-                max_meta_probs, predicted_meta = \
-                    torch.max(output_meta.data, 1)
+                _, predicted_meta = torch.max(output_meta.data, 1)
                 meta_preds_all.extend(predicted_meta.cpu().numpy())
 
                 len_y = len(data_y)

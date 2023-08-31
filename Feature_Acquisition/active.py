@@ -155,7 +155,9 @@ class ActiveDataset(BaseDataset):
 class AFE(BaseMethod):
     def __init__(self, model_classifier, model_meta, device):
         self.model_classifier = model_classifier
+        self.model_classifier.to(device)
         self.model_meta = model_meta
+        self.model_meta.to(device)
         self.device = device
         self.report = []
 
@@ -195,7 +197,7 @@ class AFE(BaseMethod):
         classifier_pred = torch.nn.functional.softmax(classifier_pred, dim=1)
         meta_pred = torch.nn.functional.softmax(meta_pred, dim=1)
         return torch.sum(classifier_pred * torch.log(classifier_pred /
-                                                     meta_pred))
+                                                     meta_pred), dim=1)
 
     def AFELoss_loaders(self, dataloader_unlabeled, dataloader_labeled,
                         num_classes):
@@ -210,57 +212,75 @@ class AFE(BaseMethod):
         batch = -1
         idxes_so_far = 0
         batch_l = -1
-        for iters in enumerate(dataloader_unlabeled):
-            if len(iters) == 2:
-                batch = iters[0]
-                indices, (data_x, data_y, _) = iters[1]
-            else:
-                data_x, data_y, _ = iters
-                batch += 1
-            batch_size = data_x.size()[0]
-            data_x = data_x.to(self.device)
-            data_y = data_y.to(self.device)
-            output_classifier = self.model_classifier(data_x)
+        with torch.no_grad():
+            for iters in enumerate(dataloader_unlabeled):
+                if len(iters) == 2:
+                    batch = iters[0]
+                    indices, (data_x, data_y, _) = iters[1]
+                else:
+                    data_x, data_y, _ = iters
+                    batch += 1
 
-            for iters_in in enumerate(dataloader_labeled):
+                batch_size = data_x.size()[0]
+                data_x = data_x.to(self.device)
+                data_y = data_y.to(self.device)
+                output_classifier = self.model_classifier(data_x)
 
-                if len(iters_in) == 2:
-                    batch_l, (indices_l, (data_x_l, _, hum_preds)) =\
-                         iters_in
-                elif len(iters_in) == 3:
-                    data_x_l, _, hum_preds = iters_in
-                    batch_l += 1
+                for iters_in in enumerate(dataloader_labeled):
 
-                batch_size_l = data_x_l.size()[0]
-                data_x_l = data_x_l.to(self.device)
-                hum_preds = hum_preds.to(self.device)
-                # check whether human predictions are one-hot encoded
-                if len(hum_preds.shape) == 1:
-                    hum_preds = torch.nn.functional.one_hot(hum_preds,
-                                                            num_classes)
+                    if len(iters_in) == 2:
+                        batch_l, (_, (data_x_l, _, hum_preds)) =\
+                            iters_in
+                    elif len(iters_in) == 3:
+                        data_x_l, _, hum_preds = iters_in
+                        batch_l += 1
 
-                output_meta = self.model_meta(data_x_l, hum_preds)
+                    batch_size_l = data_x_l.size()[0]
+                    data_x_l = data_x_l.to(self.device)
+                    hum_preds = hum_preds.to(self.device)
+                    # check whether human predictions are one-hot encoded
+                    if len(hum_preds.shape) == 1:
+                        hum_preds = torch.nn.functional.one_hot(hum_preds,
+                                                                num_classes)
 
-                for i in range(batch_size):
+                    output_meta = self.model_meta(data_x_l, hum_preds)
 
                     for j in range(batch_size_l):
-                        if batch_size != 1:
-                            o1 = output_classifier[i].unsqueeze(0)
+                        o1 = output_classifier
+                        o2 = output_meta[j].unsqueeze(0)
+                        if j == 0:
+                            KL_loss_local = self.AFELoss(o1, o2)
+                            normalizer_local = 1
+                            indices_tot_local = indices
                         else:
-                            o1 = output_classifier
-                        if batch_size_l != 1:
-                            o2 = output_meta[j].unsqueeze(0)
+                            KL_loss_local += self.AFELoss(o1, o2)
+                            normalizer_local += 1
+                    for i in range(batch_size):
+                        if batch_l == 0:
+                            KL_loss.append(KL_loss_local[i])
+                            normalizer.append(normalizer_local)
+                            indices_tot.append(indices_tot_local[i])
                         else:
-                            o2 = output_meta
-                        if batch_l == 0 and j == 0:
-                            KL_loss.append(self.AFELoss(o1, o2))
-                            normalizer.append(1)
-                            indices_tot.append(indices[i])
-                        else:
-                            KL_loss[idxes_so_far+i] += self.AFELoss(o1, o2)
-                            normalizer[idxes_so_far+i] += 1
+                            KL_loss[idxes_so_far+i] += KL_loss_local[i]
+                            normalizer[idxes_so_far+i] += normalizer_local
+                        # for j in range(batch_size_l):
+                        #     if batch_size != 1:
+                        #         o1 = output_classifier[i].unsqueeze(0)
+                        #     else:
+                        #         o1 = output_classifier
+                        #     if batch_size_l != 1:
+                        #         o2 = output_meta[j].unsqueeze(0)
+                        #     else:
+                        #         o2 = output_meta
+                        #     if batch_l == 0 and j == 0:
+                        #         KL_loss.append(self.AFELoss(o1, o2))
+                        #         normalizer.append(1)
+                        #         indices_tot.append(indices[i])
+                        #     else:
+                        #         KL_loss[idxes_so_far+i] += self.AFELoss(o1, o2)
+                        #         normalizer[idxes_so_far+i] += 1
 
-            idxes_so_far += batch_size
+                idxes_so_far += batch_size
 
         KL_loss = torch.tensor(KL_loss)
         normalizer = torch.tensor(normalizer)
@@ -286,7 +306,7 @@ class AFE(BaseMethod):
         end = time.time()
 
         self.model_meta.train()
-        for batch, (idx, (data_x, data_y, hum_preds)) in enumerate(dataloader):
+        for batch, (_, (data_x, data_y, hum_preds)) in enumerate(dataloader):
             data_x = data_x.to(self.device)
             data_y = data_y.to(self.device)
             hum_preds = hum_preds.to(self.device)
@@ -324,6 +344,7 @@ class AFE(BaseMethod):
                         top1=top1,
                     )
                 )
+
 
     def fit_El_epoch(self, dataloader, n_classes, optimizer,
                      verbose=False, epoch=1):
@@ -439,8 +460,8 @@ class AFE(BaseMethod):
 
         params_class = list(self.model_classifier.parameters())
         params_meta = list(self.model_meta.parameters())
-        optimizer_classifier = torch.optim.Adam(params_class, lr=lr)
-        optimizer_meta = torch.optim.Adam(params_meta, lr=lr)
+        optimizer_classifier = torch.optim.Adam(params_class, lr=lr, weight_decay=5e-4)
+        optimizer_meta = torch.optim.Adam(params_meta, lr=lr, weight_decay=5e-4)
 
         if scheduler_classifier is not None:
             scheduler_classifier = scheduler_classifier(optimizer_classifier)
@@ -470,7 +491,6 @@ class AFE(BaseMethod):
                 scheduler_classifier.step()
         self.model_classifier.load_state_dict(best_model_class)
 
-
         def criterion(dataloader1, dataloader2):
             return self.AFELoss_loaders(dataloader1, dataloader2, n_classes)
         Dataset.Query(criterion, pool_size=0, query_size=query_size)
@@ -487,6 +507,7 @@ class AFE(BaseMethod):
 
         for i in range(num_queries):
             Dataset.Query(criterion, pool_size=0, query_size=query_size)
+            self.model_meta.weight_init()
             Fit_Unlabeled()
             self.report_iteration(i, Dataset, n_classes)
 
@@ -514,6 +535,8 @@ class AFE(BaseMethod):
                                                        self.loss_defer,
                                                        defer_size)
         self.report.append(report_dict)
+        logging.info("query_num: %d, defer_size: %d, loss_defer: %f",\
+                        query_num, defer_size, report_dict["loss_defer"])
 
     def test(self, dataloader):
         predictions_all = []
@@ -536,6 +559,14 @@ class AFE(BaseMethod):
                         output_class, dim=1).cpu().numpy())
 
                 hum_preds = F.one_hot(hum_preds, num_classes=10)
+                hum_preds = hum_preds.to(self.device)
+                # print("self.device", self.device)
+                # if self.device == torch.device("cuda:0"):
+                #     assert next(self.model_meta.parameters()).is_cuda
+                # else:
+                #     assert not next(self.model_meta.parameters()).is_cuda
+                # assert hum_preds.device == self.device
+                # assert data_x.device == self.device
                 output_meta = self.model_meta(data_x, hum_preds)
                 output_meta = F.softmax(output_meta, dim=1)
                 _, predicted_meta = torch.max(output_meta.data, 1)

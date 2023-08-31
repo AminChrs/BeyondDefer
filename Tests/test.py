@@ -8,8 +8,13 @@ from human_ai_deferral.networks.cnn import NetSimple
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
+import json
+import logging
+import matplotlib.pyplot as plt
+logging.getLogger().setLevel(logging.INFO)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # np.seterr(invalid='raise')
 
 def test_indexed():
@@ -40,7 +45,7 @@ def test_indexed():
             assert y.item() >= 0 and y.item() < 10
             assert m.item() >= 0 and m.item() < 10
             assert index == i
-    print("Test Indexed Dataset Passed!")
+    logging.info("Test Indexed Dataset Passed!")
 
 
 def test_active_mask():
@@ -65,7 +70,7 @@ def test_active_mask():
         Dataset_Hate_Active.mask(125)
         assert Dataset_Hate_Active.mask_label(125) == 1
         assert Dataset_Hate_Active.mask_label(126) == 0
-    print("Test Active Dataset Passed!")
+    logging.info("Test Active Dataset Passed!")
 
 
 def test_active_query():
@@ -96,7 +101,7 @@ def test_active_query():
     assert idx_highest != 0
     assert Dataset_CIFAR_Active.mask_label(idx_highest) == 1
     assert Dataset_CIFAR_Active.mask_label(idx_highest - 1) == 0
-    print("Test Active Query Passed!")
+    logging.info("Test Active Query Passed!")
 
 
 def test_AFE_loss():
@@ -130,7 +135,7 @@ def test_AFE_loss():
             torch.Size([])
         index += 1
         break
-    print("Test AFE Passed!")
+    logging.info("Test AFE Passed!")
 
 
 def test_AFE_loss_loaders():
@@ -166,7 +171,7 @@ def test_AFE_loss_loaders():
                                                  dataset_loader2, 10)
     assert KL_loss.shape == torch.Size([len_1])
     assert len(indices) == len_1
-    print("Test AFE Loss Loaders Passed!")
+    logging.info("Test AFE Loss Loaders Passed!")
 
 
 def test_Meta_model():
@@ -190,7 +195,7 @@ def test_Meta_model():
 
         assert Meta(x, m).shape == torch.Size([512, 10])
         break
-    print("Test Meta Model Passed!")
+    logging.info("Test Meta Model Passed!")
 
 
 def test_AFE_fit_epochs():
@@ -217,7 +222,7 @@ def test_AFE_fit_epochs():
     AFE_CIFAR.fit_El_epoch(Dataset_CIFAR_Active.data_train_loader, 10, optim,
                            verbose=True)
 
-    print("Test AFE Fit Classifier Passed!")
+    logging.info("Test AFE Fit Classifier Passed!")
 
 
 def test_AFE_CE_loss():
@@ -243,7 +248,7 @@ def test_AFE_CE_loss():
     assert yhat.shape == torch.Size([512, 10])
     assert y.shape == torch.Size([512])
     assert AFE_CIFAR.Loss(yhat, y).shape == torch.Size([512])
-    print("Test AFE CE Loss Passed!")
+    logging.info("Test AFE CE Loss Passed!")
 
 
 def test_AFE_fit_Eu():
@@ -257,11 +262,21 @@ def test_AFE_fit_Eu():
     Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
     Meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
                    remove_layers=["fc3", "softmax"]).to(device)
+    Meta.weight_init()
 
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
-    optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.001)
+    # optimizer_meta = torch.optim.SGD(Meta.parameters(), 0.001, #0.001
+    #                             momentum=0.9, nesterov=True,
+    #                             weight_decay=5e-4)
+
+    optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.001, weight_decay=5e-4)
+
+    # cosine learning rate
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_meta, 34000 * 150)
+
+    # optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.01)
 
     def criterion(loader_unlabeled, _):
         indices = []
@@ -277,11 +292,11 @@ def test_AFE_fit_Eu():
         # Convert to tensor
         Loss = torch.tensor(Loss)
         return Loss, indices
+    Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=34000)
     Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
-    Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
-    AFE_CIFAR.fit_Eu(2, Dataset_CIFAR_Active,
-                     10, optimizer_meta, verbose=True)
-    print("Test AFE Fit Eu Passed!")
+    AFE_CIFAR.fit_Eu(150, Dataset_CIFAR_Active,
+                     10, optimizer_meta, verbose=True, scheduler_meta=scheduler)
+    logging.info("Test AFE Fit Eu Passed!")
 
 
 def test_AFE_fit():
@@ -298,10 +313,15 @@ def test_AFE_fit():
 
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
-
+    def scheduler(z): return torch.optim.lr_scheduler.CosineAnnealingLR(z, 34000*50)
     AFE_CIFAR.fit(Dataset_CIFAR_Active,
-                  10, 1, lr=0.001, verbose=True, query_size=10)
-    print("Test AFE fit passed!")
+                  10, 50, lr=0.001, verbose=True, query_size=100,
+                  num_queries=100, scheduler_classifier=scheduler,
+                  scheduler_meta=scheduler)
+    # save AFE_CIFAR.report as a Json file
+    with open('AFE_CIFAR_report.json', 'w') as fp:
+        json.dump(AFE_CIFAR.report, fp)
+    logging.info("Test AFE fit passed!")
 
 
 def test_Query_unnumbered():
@@ -339,7 +359,7 @@ def test_Query_unnumbered():
                                         criterion, AFE_CIFAR.loss_defer)
     assert min_idx.shape == torch.Size([])
     assert min_idx < len_val
-    print("Test Query Unnumbered passed!")
+    logging.info("Test Query Unnumbered passed!")
 
 def test_Query_test():
 
@@ -374,11 +394,11 @@ def test_Query_test():
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
     loss = Dataset_CIFAR_Active.Query_test(criterion, AFE_CIFAR.loss_defer, 10)
-    print(loss)
+    logging.info(loss)
     assert isinstance(loss, float)
     assert loss >= 0
     assert not np.isnan(loss)
-    print("Test Query Test passed!")
+    logging.info("Test Query Test passed!")
 
 
 def test_iteration_report():
@@ -401,6 +421,26 @@ def test_iteration_report():
     assert AFE_CIFAR.report[0]["query_num"] == 0
     assert AFE_CIFAR.report[0]["defer_size"] >= 0
     assert AFE_CIFAR.report[0]["loss_defer"] > 0.0
+    with open('AFE_CIFAR_report.json', 'r') as fp:
+        AFE_CIFAR_report = json.load(fp)
+        meta_loss = np.zeros(len(AFE_CIFAR_report))
+        class_loss = np.zeros(len(AFE_CIFAR_report))
+        defer_loss = np.zeros(len(AFE_CIFAR_report))
+        for i in range(len(AFE_CIFAR_report)):
+            meta_loss[i] = AFE_CIFAR_report[i]["test_metrics_meta"]["meta_all_acc"]
+            class_loss[i] = AFE_CIFAR_report[i]["test_metrics_class"]["classifier_all_acc"]
+            defer_loss[i] = AFE_CIFAR_report[i]["loss_defer"]
+    
+    # Plot
+    plt.figure()
+    plt.plot(meta_loss, label="meta_loss")
+    plt.plot(class_loss, label="class_loss")
+    plt.plot(defer_loss, label="defer_loss")
+    plt.legend()
+    plt.savefig("AFE_CIFAR_report.pdf", format="pdf")
+
+    logging.info("Test Iteration Report passed!")
+
 
 # test_indexed()
 # test_active_mask()
@@ -411,7 +451,7 @@ def test_iteration_report():
 # test_AFE_CE_loss()
 # test_AFE_fit_epochs()
 # test_AFE_fit_Eu()
-test_AFE_fit()
 # test_Query_unnumbered()
 # test_Query_test()
 # test_iteration_report()
+test_AFE_fit()

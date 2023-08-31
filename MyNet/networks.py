@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
 # import copy
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,6 +30,8 @@ class MetaNet(nn.Module):
         for layer in remove_layers:
             # layer is a string
             setattr(self.pretrained, layer, Identity())
+        
+        self.n_linear_layers = n_linear_layers
         self.conv_layers = []
         self.linear_layers = []
         self.linear_layers_after_concat = []
@@ -121,3 +124,33 @@ class MetaNet(nn.Module):
         for layer in self.linear_layers_after_concat:
             x = layer(x)
         return x
+    
+    def to(self, dev):
+        self.pretrained.to(dev)
+        for layer in self.conv_layers:
+            layer.to(dev)
+        for layer in self.linear_layers:
+            layer.to(dev)
+        for layer in self.linear_layers_after_concat:
+            layer.to(dev)
+        self.added_layers.to(dev)
+        return self
+    def parameters(self):
+        list = [*self.pretrained.parameters()]
+        if len(self.conv_layers) != 0:
+            for layer in self.conv_layers:
+                list += layer.parameters()
+        if self.n_linear_layers != 0:
+            for layer in self.linear_layers:
+                list += layer.parameters()
+        if len(self.linear_layers_after_concat) != 0:
+            for layer in self.linear_layers_after_concat:
+                list += layer.parameters()
+        if len(self.added_layers) != 0:
+            list += self.added_layers.parameters()
+        return list
+    def weight_init(self):
+        for param in self.parameters():
+            if param.requires_grad:
+                param.data.uniform_(-1e-5, 1e-5)
+                

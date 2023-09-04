@@ -198,8 +198,8 @@ def accs(p, q, num_symbol_Y):
 
 
 def main():
-    p = 0.2
-    q_list = np.arange(0.1, 1.0, 0.03)
+    p = 0.4
+    q_list = np.arange(0.03, 1.0, 0.03)
 
     acc_joint_list = np.zeros(len(q_list))
     acc_X1_list = np.zeros(len(q_list))
@@ -211,7 +211,7 @@ def main():
     MI_Y_Y_diff_joint_list = np.zeros(len(q_list))
 
     for i in range(len(q_list)):
-        num_symbol_Y = 4
+        num_symbol_Y = 3
         # generate num_symbol_Y-dimensional array p out of p by attaching (1-p)/2 for num_symbol_Y-1 times to the left and right
         p_n = np.hstack((np.ones(num_symbol_Y-1)*(p)/(num_symbol_Y-1), 1-p))
         # generate array q out of q

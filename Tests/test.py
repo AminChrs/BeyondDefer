@@ -4,6 +4,7 @@ from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
 from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
 from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
 from MyNet.networks import MetaNet
+from MyMethod.beyond_defer import BeyondDefer
 from human_ai_deferral.networks.cnn import NetSimple
 import torch
 import numpy as np
@@ -11,11 +12,12 @@ from torch.utils.data import DataLoader
 import json
 import logging
 import matplotlib.pyplot as plt
+
 logging.getLogger().setLevel(logging.INFO)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# np.seterr(invalid='raise')
+#np.seterr(invalid='raise')
 
 def test_indexed():
 
@@ -442,6 +444,109 @@ def test_iteration_report():
     logging.info("Test Iteration Report passed!")
 
 
+def test_OVA_loss():
+    # y are n number between 0 and 9
+    pred = torch.randn(10, 10)
+
+    # Initialize method
+    model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_human = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                         remove_layers=["fc3", "softmax"]).to(device)
+    BD = BeyondDefer(10, model_classifier, model_human, model_meta, device)
+
+    loss = BD.LossOVA(pred, 1)
+    loss2 = BD.LossOVA(pred, -1)
+    assert isinstance(loss, torch.Tensor)
+    assert not np.isnan(loss.cpu().numpy()).any()
+    assert isinstance(loss2, torch.Tensor)
+    assert not np.isnan(loss2.cpu().numpy()).any()
+    assert loss.shape == torch.Size([10, 10])
+    for i in range(10):
+        for j in range(10):
+            assert loss[i, j] >= 0
+            assert loss2[i, j] >= 0
+
+    logging.info("Test OVA Loss passed!")
+
+
+def test_BD_loss():
+
+    # Image
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+
+#     Initialize method
+    model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_human = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                         remove_layers=["fc3", "softmax"]).to(device)
+    BD = BeyondDefer(10, model_classifier, model_human, model_meta, device)
+
+    x, y, m = next(iter(Dataset_CIFAR.data_train_loader))
+    # make m one-hot
+    m_oh = torch.nn.functional.one_hot(m, num_classes=10).float()
+    assert m_oh.shape == torch.Size([512, 10])
+
+    model_pred = model_classifier(x)
+    human_pred = model_human(x)
+    meta_pred = model_meta(x, m_oh)
+
+    loss = BD.surrogate_loss(model_pred, human_pred, meta_pred, m, y)
+    print("loss: ", loss)
+    assert isinstance(loss, torch.Tensor)
+    assert not np.isnan(loss.detach().cpu().numpy()).any()
+    assert loss.shape == torch.Size([])
+    assert loss >= 0
+    print("Test BD Loss passed!")
+
+
+def test_BD_fit_epoch():
+
+    # Image
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+
+    # Initialize method
+    model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_human = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                         remove_layers=["fc3", "softmax"]).to(device)
+
+    BD = BeyondDefer(10, model_classifier, model_human, model_meta, device)
+
+    # Fit
+    params = list(model_classifier.parameters()) +\
+        list(model_human.parameters()) + \
+        list(model_meta.parameters())
+    optimizer = torch.optim.Adam(params, lr=0.001, weight_decay=0.0005)
+    BD.fit_epoch(Dataset_CIFAR.data_train_loader, 10, optimizer,
+                 verbose=True)
+    print("Test BD fit epoch passed!")
+
+
+def test_BD_fit():
+
+    # Image
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+
+    # Initialize method
+    model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_human = NetSimple(10, 50, 50, 100, 20).to(device)
+    model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20), [1, 20, 1],
+                         remove_layers=["fc3", "softmax"]).to(device)
+
+    BD = BeyondDefer(10, model_classifier, model_human, model_meta, device)
+
+    # Fit
+    def scheduler(z, l): return torch.optim.lr_scheduler.CosineAnnealingLR(z, l)
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr, weight_decay=0.0005)
+    BD.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+           Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    print("Test BD fit passed!")
+
 # test_indexed()
 # test_active_mask()
 # test_active_query()
@@ -454,4 +559,8 @@ def test_iteration_report():
 # test_Query_unnumbered()
 # test_Query_test()
 # test_iteration_report()
-test_AFE_fit()
+# test_AFE_fit()
+# test_OVA_loss()
+# test_BD_loss()
+# test_BD_fit_epoch()
+test_BD_fit()

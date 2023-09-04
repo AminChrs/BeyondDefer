@@ -4,7 +4,6 @@
 # The threshold is found via a grid search in validation set
 import sys
 sys.path.append("..")
-sys.path.append("../human_ai_deferral")
 import copy
 import torch
 from human_ai_deferral.datasetsdefer.basedataset import BaseDataset
@@ -344,7 +343,6 @@ class AFE(BaseMethod):
                         top1=top1,
                     )
                 )
-
 
     def fit_El_epoch(self, dataloader, n_classes, optimizer,
                      verbose=False, epoch=1):

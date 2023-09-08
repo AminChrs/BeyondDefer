@@ -1,8 +1,10 @@
 import sys
 sys.path.append("../")
 from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
+from MyNet.call_net import networks, optimizer_scheduler
 from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
 from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
+from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
 from human_ai_deferral.networks.cnn import NetSimple
@@ -17,7 +19,8 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#np.seterr(invalid='raise')
+# np.seterr(invalid='raise')
+
 
 def test_indexed():
 
@@ -273,10 +276,12 @@ def test_AFE_fit_Eu():
     #                             momentum=0.9, nesterov=True,
     #                             weight_decay=5e-4)
 
-    optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.001, weight_decay=5e-4)
+    optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.001,
+                                      weight_decay=5e-4)
 
     # cosine learning rate
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_meta, 34000 * 150)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_meta,
+                                                           34000 * 150)
 
     # optimizer_meta = torch.optim.Adam(Meta.parameters(), lr=0.01)
 
@@ -297,7 +302,8 @@ def test_AFE_fit_Eu():
     Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=34000)
     Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
     AFE_CIFAR.fit_Eu(150, Dataset_CIFAR_Active,
-                     10, optimizer_meta, verbose=True, scheduler_meta=scheduler)
+                     10, optimizer_meta, verbose=True,
+                     scheduler_meta=scheduler)
     logging.info("Test AFE Fit Eu Passed!")
 
 
@@ -315,7 +321,10 @@ def test_AFE_fit():
 
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
-    def scheduler(z): return torch.optim.lr_scheduler.CosineAnnealingLR(z, 34000*50)
+
+    def scheduler(z):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, 34000*50)
+
     AFE_CIFAR.fit(Dataset_CIFAR_Active,
                   10, 50, lr=0.001, verbose=True, query_size=100,
                   num_queries=100, scheduler_classifier=scheduler,
@@ -363,9 +372,10 @@ def test_Query_unnumbered():
     assert min_idx < len_val
     logging.info("Test Query Unnumbered passed!")
 
+
 def test_Query_test():
 
-     # Image
+    # Image
     expert_k = 5
     Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
     Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
@@ -429,10 +439,12 @@ def test_iteration_report():
         class_loss = np.zeros(len(AFE_CIFAR_report))
         defer_loss = np.zeros(len(AFE_CIFAR_report))
         for i in range(len(AFE_CIFAR_report)):
-            meta_loss[i] = AFE_CIFAR_report[i]["test_metrics_meta"]["meta_all_acc"]
-            class_loss[i] = AFE_CIFAR_report[i]["test_metrics_class"]["classifier_all_acc"]
+            meta_loss[i] = \
+                AFE_CIFAR_report[i]["test_metrics_meta"]["meta_all_acc"]
+            class_loss[i] = \
+                AFE_CIFAR_report[i]["test_metrics_class"]["classifier_all_acc"]
             defer_loss[i] = AFE_CIFAR_report[i]["loss_defer"]
-    
+
     # Plot
     plt.figure()
     plt.plot(meta_loss, label="meta_loss")
@@ -540,27 +552,51 @@ def test_BD_fit():
     BD = BeyondDefer(10, model_classifier, model_human, model_meta, device)
 
     # Fit
-    def scheduler(z, l): return torch.optim.lr_scheduler.CosineAnnealingLR(z, l)
-    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr, weight_decay=0.0005)
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       weight_decay=0.0005)
     BD.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.001,
+           Dataset_CIFAR.data_test_loader, 10, 80, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)
     print("Test BD fit passed!")
 
-# test_indexed()
-# test_active_mask()
-# test_active_query()
-# test_Meta_model()
-# test_AFE_loss()
-# test_AFE_loss_loaders()
-# test_AFE_CE_loss()
-# test_AFE_fit_epochs()
-# test_AFE_fit_Eu()
-# test_Query_unnumbered()
-# test_Query_test()
-# test_iteration_report()
-# test_AFE_fit()
-# test_OVA_loss()
-# test_BD_loss()
-# test_BD_fit_epoch()
-test_BD_fit()
+
+def test_BD_fit_CIFAR10h():
+
+    # image
+    dataset = Cifar10h(False, data_dir='../data')
+
+    # models
+    classifier, human, meta = networks("cifar10h", "BD", device)
+
+    # BD
+    BD = BeyondDefer(10, classifier, human, meta, device)
+    optimizer, scheduler = optimizer_scheduler()
+
+    # fit
+    BD.fit(dataset.data_train_loader, dataset.data_val_loader,
+           dataset.data_test_loader, 10, 80, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    print("Test BD on CIFAR-10H fit passed!")
+
+
+if __name__ == "__main__":
+    # test_indexed()
+    # test_active_mask()
+    # test_active_query()
+    # test_Meta_model()
+    # test_AFE_loss()
+    # test_AFE_loss_loaders()
+    # test_AFE_CE_loss()
+    # test_AFE_fit_epochs()
+    # test_AFE_fit_Eu()
+    # test_Query_unnumbered()
+    # test_Query_test()
+    # test_iteration_report()
+    # test_AFE_fit()
+    # test_OVA_loss()
+    # test_BD_loss()
+    # test_BD_fit_epoch()
+    test_BD_fit()

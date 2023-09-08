@@ -3,7 +3,8 @@
 # Afterwards, I update my belief about the human label and re-train the model
 # The threshold is found via a grid search in validation set
 import sys
-sys.path.append("..")
+sys.path.append("../")
+sys.path.append("../human_ai_deferral")
 import copy
 import torch
 from human_ai_deferral.datasetsdefer.basedataset import BaseDataset
@@ -19,6 +20,7 @@ import time
 import numpy as np
 import torch.nn.functional as F
 logging.getLogger().setLevel(logging.INFO)
+
 
 class IndexedDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, split="train"):
@@ -139,16 +141,22 @@ class ActiveDataset(BaseDataset):
         indices_query = self.indices_Query(criterion, query_size=len_test,
                                            split="test")
         loss = 0.0
+        loss_defer = 0.0
+        loss_no_defer = 0.0
         for i in range(size):
             idx, (x, y, hum_pred) = self.test_dataset[indices_query[i]]
             assert idx == indices_query[i]
             loss += loss_criterion(x, hum_pred, y, defer=True)
+            loss_defer += loss_criterion(x, hum_pred, y, defer=True)
         for i in range(size, len_test):
             idx, (x, y, hum_pred) = self.test_dataset[indices_query[i]]
             assert idx == indices_query[i]
             loss += loss_criterion(x, hum_pred, y, defer=False)
+            loss_no_defer += loss_criterion(x, hum_pred, y, defer=False)
         loss = loss/len_test
-        return loss
+        loss_defer = loss_defer/size
+        loss_no_defer = loss_no_defer/(len_test-size)
+        return loss, loss_defer, loss_no_defer
 
 
 class AFE(BaseMethod):
@@ -276,7 +284,8 @@ class AFE(BaseMethod):
                         #         normalizer.append(1)
                         #         indices_tot.append(indices[i])
                         #     else:
-                        #         KL_loss[idxes_so_far+i] += self.AFELoss(o1, o2)
+                        #         KL_loss[idxes_so_far+i] += self.AFELoss
+                        # (o1, o2)
                         #         normalizer[idxes_so_far+i] += 1
 
                 idxes_so_far += batch_size
@@ -454,12 +463,14 @@ class AFE(BaseMethod):
 
         train_loader = Dataset.data_train_loader
         val_loader = Dataset.data_val_loader
-        test_loader = Dataset.data_test_loader
+        # test_loader = Dataset.data_test_loader
 
         params_class = list(self.model_classifier.parameters())
         params_meta = list(self.model_meta.parameters())
-        optimizer_classifier = torch.optim.Adam(params_class, lr=lr, weight_decay=5e-4)
-        optimizer_meta = torch.optim.Adam(params_meta, lr=lr, weight_decay=5e-4)
+        optimizer_classifier = torch.optim.Adam(params_class, lr=lr,
+                                                weight_decay=5e-4)
+        optimizer_meta = torch.optim.Adam(params_meta, lr=lr,
+                                          weight_decay=5e-4)
 
         if scheduler_classifier is not None:
             scheduler_classifier = scheduler_classifier(optimizer_classifier)
@@ -527,14 +538,18 @@ class AFE(BaseMethod):
                                         criterion, self.loss_defer)
         proportion = (min_idx+1)/len_val
         len_test = len(Dataset.data_test_loader.dataset)
+        logging.info("Len TEst: {}".format(len_test))
         defer_size = int(np.floor(proportion*len_test))
         report_dict["defer_size"] = defer_size
-        report_dict["loss_defer"] = Dataset.Query_test(criterion,
-                                                       self.loss_defer,
-                                                       defer_size)
+        report_dict["loss_hybrid"], report_dict["loss_defer"], \
+            report_dict["loss_no_defer"] = Dataset.Query_test(criterion,
+                                                              self.loss_defer,
+                                                              defer_size)
         self.report.append(report_dict)
-        logging.info("query_num: %d, defer_size: %d, loss_defer: %f",\
-                        query_num, defer_size, report_dict["loss_defer"])
+        logging.info("query_num: %d, defer_size: %d, loss_defer: %f, \
+                     loss_no_defer: %f, loss_hybrid: %f",
+                     query_num, defer_size, report_dict["loss_defer"],
+                     report_dict["loss_no_defer"], report_dict["loss_hybrid"])
 
     def test(self, dataloader):
         predictions_all = []
@@ -558,13 +573,6 @@ class AFE(BaseMethod):
 
                 hum_preds = F.one_hot(hum_preds, num_classes=10)
                 hum_preds = hum_preds.to(self.device)
-                # print("self.device", self.device)
-                # if self.device == torch.device("cuda:0"):
-                #     assert next(self.model_meta.parameters()).is_cuda
-                # else:
-                #     assert not next(self.model_meta.parameters()).is_cuda
-                # assert hum_preds.device == self.device
-                # assert data_x.device == self.device
                 output_meta = self.model_meta(data_x, hum_preds)
                 output_meta = F.softmax(output_meta, dim=1)
                 _, predicted_meta = torch.max(output_meta.data, 1)

@@ -68,9 +68,9 @@ def main():
     date_now = date_now.strftime("%Y-%m-%d_%H%M%S")
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+    
     data_dir = '../data'
-
+    
 
     optimizer = optim.Adam
     scheduler = None

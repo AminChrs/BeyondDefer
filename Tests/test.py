@@ -1,20 +1,23 @@
-import sys
-sys.path.append("../")
 from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
 from MyNet.call_net import networks, optimizer_scheduler
 from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
 from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
 from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
 from human_ai_deferral.datasetsdefer.imagenet_16h import ImageNet16h
+from human_ai_deferral.methods.realizable_surrogate import RealizableSurrogate
+from human_ai_deferral.helpers.metrics import compute_coverage_v_acc_curve
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
 from human_ai_deferral.networks.cnn import NetSimple
+from metrics.metrics import plot_cov_vs_acc
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
 import json
 import logging
 import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings("ignore")
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -577,28 +580,113 @@ def test_BD_fit_CIFAR10h():
     optimizer, scheduler = optimizer_scheduler()
     # fit
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
-           dataset.data_test_loader, 10, 1, optimizer, lr=0.001,
+           dataset.data_test_loader, 10, 80, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)
+    plot_cov_vs_acc(BD.test(dataset.data_test_loader, 10))
     print("Test BD on CIFAR-10H fit passed!")
 
-def test_BD_fit_imagenet():
 
-    # Image 
+def test_BD_fit_Imagenet():
+
+    # image
     dataset = ImageNet16h(False, data_dir="../data/osfstorage-archive/",
-                          noise_version="125", batch_size=32, test_split=0.2,
+                          noise_version="110", batch_size=32, test_split=0.2,
                           val_split=0.01)
 
     # models
-    classifier, human, meta = networks("imagenet_16h", "BD", device)
+    classifier, human, meta = networks("imagenet", "BD", device)
 
     # BD
-    BD = BeyondDefer(16, classifier, human, meta, device)
+    BD = BeyondDefer(10, classifier, human, meta, device)
+    _, scheduler = optimizer_scheduler()
+    def optimizer(params, lr):
+        return torch.optim.AdamW(params, lr=lr)
+    # fit
+    BD.fit(dataset.data_train_loader, dataset.data_val_loader,
+           dataset.data_test_loader, 16, 80, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    plot_cov_vs_acc(BD.test(dataset.data_test_loader, 16))
+    print("Test BD on Imagenet fit passed!")
+
+def test_RS_Imagenet():
+
+    # image
+    dataset = ImageNet16h(False, data_dir="../data/osfstorage-archive/",
+                          noise_version="110", batch_size=32, test_split=0.2,
+                          val_split=0.01)
+    
+    # models
+    model = networks("imagenet", "RS", device)
+
+    # RS
+    Reallizable_Surr = RealizableSurrogate(1, 300, model, device, True)
+    optimizer, scheduler = optimizer_scheduler()
+    Reallizable_Surr.fit_hyperparam(
+        dataset.data_train_loader,
+        dataset.data_val_loader,
+        dataset.data_test_loader,
+        epochs=100,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        lr=0.001,
+        verbose=False,
+        test_interval=1,
+    )
+    # make 
+    print("Test RS on Imagenet fit passed!")
+
+def test_BD_Hatespeech():
+
+    # image
+    dataset = HateSpeech("../data/", True, False, 'random_annotator', device)
+
+    # models
+    classifier, human, meta = networks("hatespeech", "BD", device)
+
+    # BD
+    BD = BeyondDefer(10, classifier, human, meta, device)
     optimizer, scheduler = optimizer_scheduler()
     # fit
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
-           dataset.data_test_loader, 10, 1, optimizer, lr=0.001,
+           dataset.data_test_loader, 3, 200, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)
-    print("Test BD on ImageNet-16H fit passed!")
+    plot_cov_vs_acc(BD.test(dataset.data_test_loader, 4))
+    print("Test BD on HateSpeech fit passed!")
+
+def test_RS_Hatespeech():
+
+    # image
+    dataset = HateSpeech("../data/", True, False, 'random_annotator', device)
+
+    # models
+    model = networks("hatespeech", "RS", device)
+
+    # RS
+    Reallizable_Surr = RealizableSurrogate(1, 2, model, device, True)
+    optimizer, scheduler = optimizer_scheduler()
+    Reallizable_Surr.fit_hyperparam(
+        dataset.data_train_loader,
+        dataset.data_val_loader,
+        dataset.data_test_loader,
+        epochs=100,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        lr=0.001,
+        verbose=False,
+        test_interval=1,
+    )
+    cov_vs_acc = compute_coverage_v_acc_curve(Reallizable_Surr.test(dataset.data_test_loader))
+
+    cov = [m["coverage"] for m in cov_vs_acc]
+    acc = [m["system_acc"] for m in cov_vs_acc]
+    plt.plot(cov, acc)
+    plt.xlabel("coverage")
+    plt.ylabel("system accuracy")
+    plt.title("coverage vs system accuracy")
+    plt.show()
+    plt.savefig("coverage_vs_system_acc_RS.pdf")
+    
+    print("Test RS on HateSpeech fit passed!")
 
 if __name__ == "__main__":
     # test_indexed()
@@ -617,6 +705,10 @@ if __name__ == "__main__":
     # test_OVA_loss()
     # test_BD_loss()
     # test_BD_fit_epoch()
-    # test_BD_fit()
+    test_BD_fit()
     # test_BD_fit_CIFAR10h()
-    test_BD_fit_imagenet()
+    # test_BD_fit_Imagenet()
+    # test_RS_Imagenet()
+    # test_BD_Hatespeech()
+    # test_RS_Hatespeech()
+    logging.info("All tests passed!")

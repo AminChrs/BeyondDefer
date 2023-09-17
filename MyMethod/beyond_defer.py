@@ -181,12 +181,10 @@ class BeyondDefer(BaseMethod):
             self.fit_epoch(dataloader_train, n_classes, optimizer, verbose,
                            epoch)
             if epoch % test_interval == 0 and epoch > 1:
-                if self.learnable_threshold_rej:
-                    self.fit_treshold_rej(dataloader_val)
-
                 data_test = self.test(dataloader_val, n_classes)
                 val_metrics = compute_metalearner_metrics(data_test)
                 if val_metrics["system_acc"] >= best_acc:
+                    logging.info("New best model")
                     best_acc = val_metrics["system_acc"]
                     best_model_classifier = copy.deepcopy(
                                     self.model_classifier.state_dict())
@@ -241,7 +239,7 @@ class BeyondDefer(BaseMethod):
                 _, pred_meta = torch.max(outputs_meta.data, 1)
                 prob_posthoc = torch.zeros((hum_preds.size(0))).to(self.device)
 
-                for j in range(10):
+                for j in range(n_classes):
                     one_hot_j = torch.zeros((hum_preds.size(0), n_classes))
                     one_hot_j[:, j] = 1
                     one_hot_j = one_hot_j.to(self.device)

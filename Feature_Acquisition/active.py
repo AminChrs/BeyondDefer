@@ -441,7 +441,8 @@ class AFE(BaseMethod):
             verbose=False,
             test_interval=5,
             query_size=1,
-            num_queries=100):
+            num_queries=100,
+            optimizer = None):
 
         """Fit the classifier, then find the KL divergence between each
          unlabeled points and all the labeled ones, and pick the highest
@@ -467,10 +468,14 @@ class AFE(BaseMethod):
 
         params_class = list(self.model_classifier.parameters())
         params_meta = list(self.model_meta.parameters())
-        optimizer_classifier = torch.optim.Adam(params_class, lr=lr,
-                                                weight_decay=5e-4)
-        optimizer_meta = torch.optim.Adam(params_meta, lr=lr,
-                                          weight_decay=5e-4)
+        if optimizer is None:
+            optimizer_classifier = torch.optim.Adam(params_class, lr=lr,
+                                                    weight_decay=5e-4)
+            optimizer_meta = torch.optim.Adam(params_meta, lr=lr,
+                                            weight_decay=5e-4)
+        else:
+            optimizer_classifier = optimizer(params_class, lr=lr)
+            optimizer_meta = optimizer(params_meta, lr=lr)
 
         if scheduler_classifier is not None:
             scheduler_classifier = scheduler_classifier(optimizer_classifier)

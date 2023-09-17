@@ -115,7 +115,7 @@ class SelectivePrediction(BaseMethod):
         # fit classifier and expert same time
         optimizer_class = optimizer(self.model_class.parameters(), lr=lr)
         if scheduler is not None:
-            scheduler = scheduler(optimizer, len(dataloader_train)*epochs)
+            scheduler = scheduler(optimizer_class, len(dataloader_train)*epochs)
 
         self.model_class.train()
         for epoch in tqdm(range(epochs)):

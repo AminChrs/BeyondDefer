@@ -11,6 +11,7 @@ from human_ai_deferral.networks.cnn import DenseNet121_CE
 from human_ai_deferral.networks.linear_net import LinearNet
 import os
 import numpy as np
+import logging
 
 
 def optimizer_scheduler():
@@ -92,10 +93,11 @@ def networks(dataset_name, method, device):
         if method == "BD":
             model_classifier = model_cifarh(10, device,
                                             "../models/cifar10h.pt")
-            model_human = NetSimple(10, 50, 50, 100, 20).to(device)
+            model_human = model_cifarh(10, device,
+                                       "../models/cifar10h.pt")
             model_meta = MetaNet(10, model_cifarh(10, device,
                                                   "../models/cifar10h.pt"),
-                                 [1, 20, 1],
+                                 [1, 60, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
         elif method == "AFE":
@@ -103,9 +105,8 @@ def networks(dataset_name, method, device):
                                             "../models/cifar10h_classifier.pt")
             model_meta = MetaNet(10, model_cifarh(10, device, "../models/\
                                                     cifar10h_classifier.pt"),
-                                 [1, 20, 1],
+                                 [1, 60, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
-            #   ?????
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
             model_classifier = model_cifarh(10, device,

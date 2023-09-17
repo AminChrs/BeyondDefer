@@ -5,6 +5,7 @@ from MyNet.call_net import networks, optimizer_scheduler
 from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
 from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
 from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
+from human_ai_deferral.datasetsdefer.imagenet_16h import ImageNet16h
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
 from human_ai_deferral.networks.cnn import NetSimple
@@ -569,18 +570,35 @@ def test_BD_fit_CIFAR10h():
     dataset = Cifar10h(False, data_dir='../data')
 
     # models
-    classifier, human, meta = networks("cifar10h", "BD", device)
+    classifier, human, meta = networks("cifar_10h", "BD", device)
 
     # BD
     BD = BeyondDefer(10, classifier, human, meta, device)
     optimizer, scheduler = optimizer_scheduler()
-
     # fit
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
-           dataset.data_test_loader, 10, 80, optimizer, lr=0.001,
+           dataset.data_test_loader, 10, 1, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)
     print("Test BD on CIFAR-10H fit passed!")
 
+def test_BD_fit_imagenet():
+
+    # Image 
+    dataset = ImageNet16h(False, data_dir="../data/osfstorage-archive/",
+                          noise_version="125", batch_size=32, test_split=0.2,
+                          val_split=0.01)
+
+    # models
+    classifier, human, meta = networks("imagenet_16h", "BD", device)
+
+    # BD
+    BD = BeyondDefer(16, classifier, human, meta, device)
+    optimizer, scheduler = optimizer_scheduler()
+    # fit
+    BD.fit(dataset.data_train_loader, dataset.data_val_loader,
+           dataset.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    print("Test BD on ImageNet-16H fit passed!")
 
 if __name__ == "__main__":
     # test_indexed()
@@ -599,4 +617,6 @@ if __name__ == "__main__":
     # test_OVA_loss()
     # test_BD_loss()
     # test_BD_fit_epoch()
-    test_BD_fit()
+    # test_BD_fit()
+    # test_BD_fit_CIFAR10h()
+    test_BD_fit_imagenet()

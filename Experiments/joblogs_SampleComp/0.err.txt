@@ -1,0 +1,65 @@
++ module load cuda/12.1
+++ /usr/bin/tclsh8.6 /usr/lib/x86_64-linux-gnu/modulecmd.tcl sh load cuda/12.1
+Loading cuda/12.1
+  Loading requirement: cudnn/8.9.1-cu12.x
++ eval 'LD_LIBRARY_PATH=/is/software/nvidia/cuda-12.1/lib64:/is/software/nvidia/cudnn-8.9.1-cu12.x/lib:/is/software/nvidia/cudnn-7.5-cu10.0/lib64:/is/software/nvidia/cuda-10.1/lib64;' export 'LD_LIBRARY_PATH;' 'CUDA_HOME=/is/software/nvidia/cuda-12.1;' export 'CUDA_HOME;' 'PATH=/is/software/nvidia/cuda-12.1/bin:/home/mcharusaie/.local/bin:/home/mcharusaie/anaconda3/bin:/home/mcharusaie/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin:/is/software/nvidia/cuda-10.1/bin;' export 'PATH;' '__MODULES_LMALTNAME=cudnn/8.9.1-cu12.x\&as\|cudnn/latest:cuda/12.1\&as\|cuda/latest;' export '__MODULES_LMALTNAME;' 'LIBRARY_PATH=/is/software/nvidia/cudnn-8.9.1-cu12.x/lib:/is/software/nvidia/cudnn-7.5-cu10.0/lib64;' export 'LIBRARY_PATH;' '__MODULES_LMPREREQ=cuda/12.1\&cudnn/8.9.1-cu12.x;' export '__MODULES_LMPREREQ;' '_LMFILES_=/is/software/modules/cudnn/8.9.1-cu12.x:/is/software/modules/cuda/12.1;' export '_LMFILES_;' 'LOADEDMODULES=cudnn/8.9.1-cu12.x:cuda/12.1;' export 'LOADEDMODULES;' 'CPLUS_INCLUDE_PATH=/is/software/nvidia/cuda-12.1/include:/is/software/nvidia/cudnn-8.9.1-cu12.x/include:/is/software/nvidia/cudnn-7.5-cu10.0/include;' export 'CPLUS_INCLUDE_PATH;' 'C_INCLUDE_PATH=/is/software/nvidia/cuda-12.1/include:/is/software/nvidia/cudnn-8.9.1-cu12.x/include:/is/software/nvidia/cudnn-7.5-cu10.0/include;' export 'C_INCLUDE_PATH;' '__MODULES_LMTAG=cudnn/8.9.1-cu12.x\&auto-loaded;' export '__MODULES_LMTAG;' test '0;'
+++ LD_LIBRARY_PATH=/is/software/nvidia/cuda-12.1/lib64:/is/software/nvidia/cudnn-8.9.1-cu12.x/lib:/is/software/nvidia/cudnn-7.5-cu10.0/lib64:/is/software/nvidia/cuda-10.1/lib64
+++ export LD_LIBRARY_PATH
+++ CUDA_HOME=/is/software/nvidia/cuda-12.1
+++ export CUDA_HOME
+++ PATH=/is/software/nvidia/cuda-12.1/bin:/home/mcharusaie/.local/bin:/home/mcharusaie/anaconda3/bin:/home/mcharusaie/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin:/is/software/nvidia/cuda-10.1/bin
+++ export PATH
+++ __MODULES_LMALTNAME='cudnn/8.9.1-cu12.x&as|cudnn/latest:cuda/12.1&as|cuda/latest'
+++ export __MODULES_LMALTNAME
+++ LIBRARY_PATH=/is/software/nvidia/cudnn-8.9.1-cu12.x/lib:/is/software/nvidia/cudnn-7.5-cu10.0/lib64
+++ export LIBRARY_PATH
+++ __MODULES_LMPREREQ='cuda/12.1&cudnn/8.9.1-cu12.x'
+++ export __MODULES_LMPREREQ
+++ _LMFILES_=/is/software/modules/cudnn/8.9.1-cu12.x:/is/software/modules/cuda/12.1
+++ export _LMFILES_
+++ LOADEDMODULES=cudnn/8.9.1-cu12.x:cuda/12.1
+++ export LOADEDMODULES
+++ CPLUS_INCLUDE_PATH=/is/software/nvidia/cuda-12.1/include:/is/software/nvidia/cudnn-8.9.1-cu12.x/include:/is/software/nvidia/cudnn-7.5-cu10.0/include
+++ export CPLUS_INCLUDE_PATH
+++ C_INCLUDE_PATH=/is/software/nvidia/cuda-12.1/include:/is/software/nvidia/cudnn-8.9.1-cu12.x/include:/is/software/nvidia/cudnn-7.5-cu10.0/include
+++ export C_INCLUDE_PATH
+++ __MODULES_LMTAG='cudnn/8.9.1-cu12.x&auto-loaded'
+++ export __MODULES_LMTAG
+++ test 0
++ _mlstatus=0
++ return 0
++ source /home/mcharusaie/myvenv/bin/activate
+++ deactivate nondestructive
+++ '[' -n '' ']'
+++ '[' -n '' ']'
+++ '[' -n /usr/bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '' ']'
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/home/mcharusaie/myvenv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/is/software/nvidia/cuda-12.1/bin:/home/mcharusaie/.local/bin:/home/mcharusaie/anaconda3/bin:/home/mcharusaie/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin:/is/software/nvidia/cuda-10.1/bin
+++ PATH=/home/mcharusaie/myvenv/bin:/is/software/nvidia/cuda-12.1/bin:/home/mcharusaie/.local/bin:/home/mcharusaie/anaconda3/bin:/home/mcharusaie/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/usr/lib/jvm/java-8-oracle/bin:/usr/lib/jvm/java-8-oracle/db/bin:/usr/lib/jvm/java-8-oracle/jre/bin:/is/software/nvidia/cuda-10.1/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1=
+++ PS1='(myvenv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(myvenv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /usr/bin/bash -o -n '' ']'
+++ hash -r
++++ dirname /lustre/home/mcharusaie/Git_Beyond/Experiments/run_SampleComp.sh
+++ cd /lustre/home/mcharusaie/Git_Beyond/Experiments
+++ pwd
++ MYDIR=/lustre/home/mcharusaie/Git_Beyond/Experiments
++ python3 SampleComp.py
+Traceback (most recent call last):
+  File "/lustre/home/mcharusaie/Git_Beyond/Experiments/SampleComp.py", line 3, in <module>
+    from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
+  File "/lustre/home/mcharusaie/Git_Beyond/Experiments/../human_ai_deferral/datasetsdefer/cifar_synth.py", line 32, in <module>
+    from datasetsdefer.generic_dataset import GenericImageExpertDataset
+ModuleNotFoundError: No module named 'datasetsdefer'

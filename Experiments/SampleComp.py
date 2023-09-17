@@ -1,64 +1,85 @@
-# In this file, I compare all the methods in terms of sample complexity
-# for 4 datasets CIFAR 10k, CIFAR 10H, Imagenet, and Hatespeech
-
-import sys
-sys.path.append("../")
-from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
 from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
-from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
 from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
 from human_ai_deferral.datasetsdefer.imagenet_16h import ImageNet16h
-from MyNet.networks import MetaNet
-from human_ai_deferral.networks.cnn import WideResNet
-from human_ai_deferral.baselines.selective_prediction import\
-     SelectivePrediction
-from MyMethod.beyond_defer import BeyondDefer
-from human_ai_deferral.networks.cnn import NetSimple
-import torch
-import numpy as np
-from torch.utils.data import DataLoader
-import json
-import logging
+from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
+from Experiments.basic import general_experiment, active_experiment
 import matplotlib.pyplot as plt
-import torch.nn as nn
+import torch
+import warnings
 import os
+warnings.filterwarnings("ignore")
+
+# Device
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+def accuracies(results):
+
+    acc = []
+    for i, res in enumerate(results):
+        acc.append(res[0]["system_acc"])
+    return acc
 
 
-def optimizer_scheduler():
+def plot_sample(samples, results, methods, filename):
 
-    def scheduler(z, length):
-        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+    accs = []
+    plt.figure()
 
-    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
-                                                       weight_decay=0.0005)
-    return optimizer, scheduler
+    for i in range(len(methods)):
+        accs.append([results[:][i]])
+        plt.plot(samples, accs[i], label=methods[i])
 
+    plt.xlabel("samples")
+    plt.ylabel("accuracy")
+    plt.legend()
+    plt.show()
+    plt.savefig(filename)
 
-def datasets(name, num_train, device):
+if __name__ == "Experiments.SampleComp":
+    # methods
+    methods = ["Beyond Defer", "Reallizable Surrogate", "Compare Confindences",
+               "One-versus-All", "Cross Entropy"]
+    res_dir = "SampleComp/"
 
-    if name[:11] == "cifar_synth":
-        expert_k = int(name[12:])
-        dataset = CifarSynthDataset(expert_k, False, batch_size=512)
-    elif name == "cifar_10h":
-        dataset = Cifar10h(False, data_dir='../data')
-    elif name == "hatespeech":
-        dataset = HateSpeech("../data", True, False, 'random_annotator',
-                             device)
-    elif name == "imagenet":
-        dataset = ImageNet16h(False, data_dir="../data" +
-                              "/osfstorage-archive/", noise_version=125,
-                              batch_size=32, test_split=0.2, val_split=0.01)
+    dataset_cifar = CifarSynthDataset(5, False, batch_size=512)
+    dataset_cifar10h = Cifar10h(False, data_dir='./data')
+    dataset_hate = HateSpeech("../data/", True, False, 'random_annotator',
+                              device)
+    # print the current folder
+    dataset_imagenet = ImageNet16h(False,
+                                   data_dir="./data/osfstorage-archive/",
+                                   noise_version="110", batch_size=32,
+                                   test_split=0.2,
+                                   val_split=0.01)
 
-    dataset_train = dataset.data_train_loader.dataset
-    dataset.data_train_loader = DataLoader(
-        dataset=dataset_train, batch_size=512, shuffle=True,
-        sampler=torch.utils.data.SubsetRandomSampler(
-            np.arange(num_train)))
-    return dataset
+    datasets = [dataset_cifar, dataset_cifar10h, dataset_hate,
+                dataset_imagenet]
+    i = 0
+    break_flag = False
+    # epochs = [80, 80, 200, 80]
+    epochs = [1, 1, 1, 1]
+    num_classes = [10, 10, 3, 16]
+    names = ["cifar_synth", "cifar_10h", "hatespeech", "imagenet"]
+    accs = {}
+    for i, name in enumerate(names):
+        accs[name] = []
 
+    while (True):
 
-def main():
+        for j, name in enumerate(names):
 
-    datasets = ["cifar_synth_10", "cifar_10h", "hatespeech", "imagenet"]
-    methods = ["BD", "AFE", "triage", "confidence", "selective"]
-    
+            packed_res = general_experiment(datasets[j], names[j],
+                                            epochs[j], num_classes[j],
+                                            device, subsample=True,
+                                            iter=i)
+            if not packed_res:
+                break_flag = True
+                break
+            results = list(packed_res)
+            accs[name].append(accuracies(results))
+
+        if break_flag:
+            break
+        i += 1
+
+    # plot

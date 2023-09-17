@@ -97,7 +97,7 @@ def networks(dataset_name, method, device):
                                        "../models/cifar10h.pt")
             model_meta = MetaNet(10, model_cifarh(10, device,
                                                   "../models/cifar10h.pt"),
-                                 [1, 60, 1],
+                                 [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
         elif method == "AFE":
@@ -105,7 +105,7 @@ def networks(dataset_name, method, device):
                                             "../models/cifar10h_classifier.pt")
             model_meta = MetaNet(10, model_cifarh(10, device, "../models/\
                                                     cifar10h_classifier.pt"),
-                                 [1, 60, 1],
+                                 [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
@@ -125,14 +125,14 @@ def networks(dataset_name, method, device):
             model_classifier = model_imagenet(16, device)
             model_human = model_imagenet(16, device)
             model_meta = MetaNet(16, model_imagenet(16, device),
-                                 [1, 20, 1],
-                                 remove_layers=["classifier"]).to(device)
+                                 [1, 1024, 1],
+                                 remove_layers=["densenet121.classifier"]).to(device)
             return model_classifier, model_human, model_meta
         elif method == "AFE":
             model_classifier = model_imagenet(16, device)
             model_meta = MetaNet(16, model_imagenet(16, device),
-                                 [1, 20, 1],
-                                 remove_layers=["classifier"]).to(device)
+                                 [1, 1024, 1],
+                                 remove_layers=["densenet121.classifier"]).to(device)
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
             model_classifier = model_imagenet(16, device)
@@ -145,35 +145,34 @@ def networks(dataset_name, method, device):
             model = model_imagenet(17, device)
             return model
     elif dataset_name == "hatespeech":
-        if os.path.exists("../data/hatespeech/dim.npz"):
-            dim = np.load("../data/hatespeech/dim.npz")
+        if os.path.exists("../data/hatespeech-dim.npz"):
+            dim = np.load("../data/hatespeech-dim.npz")
             d = dim["d"]
         else:
             dataset = HateSpeech("../data", True, False,
                                  'random_annotator', device)
             d = dataset.d
-            np.savez("../data/hatespeech/dim.npz", d=d)
+
+            np.savez("../data/hatespeech-dim.npz", d=d)
 
         if method == "BD":
-            model_classifier = LinearNet(d, 4).to(device)
-            model_human = LinearNet(d, 4).to(device)
-            model_meta = MetaNet(d, LinearNet(d, 4),
-                                 [1, 20, 1],
-                                 remove_layers=["fc3", "softmax"]).to(device)
+            model_classifier = LinearNet(d, 3).to(device)
+            model_human = LinearNet(d, 3).to(device)
+            model_meta = MetaNet(3, LinearNet(d, 10),
+                                 [1, 10, 1]).to(device)
             return model_classifier, model_human, model_meta
         elif method == "AFE":
-            model_classifier = LinearNet(d, 4).to(device)
-            model_meta = MetaNet(d, LinearNet(d, 4),
-                                 [1, 20, 1],
-                                 remove_layers=["fc3", "softmax"]).to(device)
+            model_classifier = LinearNet(d, 3).to(device)
+            model_meta = MetaNet(3, LinearNet(d, 10),
+                                 [1, 10, 1]).to(device)
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
-            model_classifier = LinearNet(d, 4).to(device)
+            model_classifier = LinearNet(d, 3).to(device)
             model_expert = LinearNet(d, 2).to(device)
             return model_classifier, model_expert
         elif method == "selective":
-            model = LinearNet(d, 4).to(device)
+            model = LinearNet(d, 3).to(device)
             return model
         else:
-            model = LinearNet(d, 5).to(device)
+            model = LinearNet(d, 4).to(device)
             return model

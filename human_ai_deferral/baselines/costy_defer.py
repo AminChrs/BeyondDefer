@@ -24,7 +24,7 @@ from .basemethod import BaseMethod, BaseSurrogateMethod
 eps_cst = 1e-8
 
 
-class costyDeferral:
+class CostyDeferral:
     def __init__(self, base_class):
         self.base_class = base_class
 
@@ -43,10 +43,16 @@ class costyDeferral:
         # - one_v_all:
         
         
-        if base_class.__name__ == "compare_confidence":
+        if base_class.__name__ == "CompareConfidence":
             def new_test(self, dataloader, cost):
                 # the new test method should be written here
                 pass
         
             # Replace the original method with the new one
             setattr(self, "test", new_test)
+        
+        elif base_class.__name__ == "BeyondDefer":
+            pass
+        
+        elif base_class.__name__ == "LceSurrogate":
+            pass

@@ -6,10 +6,12 @@ from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
 from human_ai_deferral.datasetsdefer.imagenet_16h import ImageNet16h
 from human_ai_deferral.methods.realizable_surrogate import RealizableSurrogate
 from human_ai_deferral.helpers.metrics import compute_coverage_v_acc_curve
+from human_ai_deferral.baselines.compare_confidence import CompareConfidence
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
+from MyMethod.costy_defer import CostyDeferral
 from human_ai_deferral.networks.cnn import NetSimple
-from metrics.metrics import plot_cov_vs_acc
+#from metrics.metrics import plot_cov_vs_acc
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -687,6 +689,37 @@ def test_RS_Hatespeech():
     plt.savefig("coverage_vs_system_acc_RS.pdf")
     
     print("Test RS on HateSpeech fit passed!")
+    
+def test_costy_deferral(): 
+    # image
+    dataset = HateSpeech("../data/", True, False, 'random_annotator', device)
+    
+    # models
+    model = networks("hatespeech", "confidence", device)
+    # CC
+    model_class, model_expert = networks("hatespeech", "confidence", device)
+    CC = CostyDeferral(CompareConfidence, model_class, model_expert, device)
+    optimizer, scheduler = optimizer_scheduler()
+    CC.fit(
+        dataset.data_train_loader,
+        dataset.data_val_loader,
+        dataset.data_test_loader,
+        epochs=100,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        lr=0.001,
+        c=0.1,
+        verbose=False,
+        test_interval=1,
+    )
+    test_data = CC.test(dataset.data_test_loader, 0.1)
+    res_CC = compute_coverage_v_acc_curve(test_data)
+    
+    print("Test CC on HateSpeech fit with costy deferral passed!")
+    
+    # import inspect
+    # code, line_no = inspect.getsourcelines(modified_class.fit_epoch_expert)
+    # print(''.join(code))    
 
 if __name__ == "__main__":
     # test_indexed()
@@ -705,10 +738,11 @@ if __name__ == "__main__":
     # test_OVA_loss()
     # test_BD_loss()
     # test_BD_fit_epoch()
-    test_BD_fit()
+    # test_BD_fit()
     # test_BD_fit_CIFAR10h()
     # test_BD_fit_Imagenet()
     # test_RS_Imagenet()
     # test_BD_Hatespeech()
     # test_RS_Hatespeech()
+    test_costy_deferral()
     logging.info("All tests passed!")

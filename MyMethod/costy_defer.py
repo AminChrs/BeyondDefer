@@ -20,9 +20,7 @@ sys.path.append("..")
 from human_ai_deferral.helpers.utils import *
 from human_ai_deferral.helpers.metrics import *
 from human_ai_deferral.baselines.basemethod import BaseMethod, BaseSurrogateMethod
-
-eps_cst = 1e-8
-
+from human_ai_deferral.baselines.compare_confidence import CompareConfidence
 
         
 class CostyDeferral:
@@ -59,10 +57,11 @@ class CostyDeferral:
                         for i in range(len(data_y)):
                             # add c in rej score
                             rej_score_all.extend(
-                                [outputs_expert[i, 1].item() - max_class_probs[i].item() - c]
+                                [outputs_expert[i, 1].item() - max_class_probs[i].item()]
                             )
-                            # add c in decision to defer here
-                            if outputs_expert[i, 1] > (max_class_probs[i] + c):
+                            
+                            # change the following boolean statement to is defer
+                            if outputs_expert[i, 1] > max_class_probs[i] + c:
                                 defers.extend([1])
                             else:
                                 defers.extend([0])
@@ -190,6 +189,129 @@ class CostyDeferral:
     def __getattr__(self, attr):
         # Delegate all other attribute access to the original class
         return getattr(self.original_class, attr)
+    
+    
+class CompareConfidenceCosty(CompareConfidence):
+    def __init__(self, model_class, model_expert, device, plotting_interval=100):
+        super().__init__(model_class, model_expert, device, plotting_interval)
+    
+    def test(self, dataloader, costs):
+        defers_all = []
+        truths_all = []
+        hum_preds_all = []
+        predictions_all = []  # classifier only
+        rej_score_all = []  # rejector probability
+        class_probs_all = []  # classifier probability
+        self.model_expert.eval()
+        self.model_class.eval()
+        with torch.no_grad():
+            for batch, (data_x, data_y, hum_preds) in enumerate(dataloader):
+                data_x = data_x.to(self.device)
+                data_y = data_y.to(self.device)
+                hum_preds = hum_preds.to(self.device)
+                outputs_class = self.model_class(data_x)
+                outputs_class = F.softmax(outputs_class, dim=1)
+                outputs_expert = self.model_expert(data_x)
+                outputs_expert = F.softmax(outputs_expert, dim=1)
+                max_class_probs, predicted_class = torch.max(outputs_class.data, 1)
+                class_probs_all.extend(outputs_class.cpu().numpy())
+                predictions_all.extend(predicted_class.cpu().numpy())
+                truths_all.extend(data_y.cpu().numpy())
+                hum_preds_all.extend(hum_preds.cpu().numpy())
+                defers = []
+                for i in range(len(data_y)):
+                    rej_score_all.extend(
+                        [outputs_expert[i, 1].item() - max_class_probs[i].item()]
+                    )
+                    if self.is_defer(outputs_expert[i, 1], outputs_class[i, :], costs):
+                        defers.extend([1])
+                    else:
+                        defers.extend([0])
+                defers_all.extend(defers)
+        # convert to numpy
+        defers_all = np.array(defers_all)
+        truths_all = np.array(truths_all)
+        hum_preds_all = np.array(hum_preds_all)
+        predictions_all = np.array(predictions_all)
+        rej_score_all = np.array(rej_score_all)
+        class_probs_all = np.array(class_probs_all)
+        data = {
+            "defers": defers_all,
+            "labels": truths_all,
+            "hum_preds": hum_preds_all,
+            "preds": predictions_all,
+            "rej_score": rej_score_all,
+            "class_probs": class_probs_all,
+        }
+        return data
+    
+    def fit(
+        self,
+        dataloader_train,
+        dataloader_val,
+        dataloader_test,
+        epochs,
+        optimizer,
+        lr,
+        costs,
+        scheduler=None,
+        verbose=True,
+        test_interval=5,
+    ):
+        """fits classifier and expert model
+
+        Args:
+            dataloader_train (_type_): train dataloader
+            dataloader_val (_type_): val dataloader
+            dataloader_test (_type_): _description_
+            epochs (_type_): training epochs
+            optimizer (_type_): optimizer function
+            lr (_type_): learning rate
+            costs (_type_): costs array 
+            scheduler (_type_, optional): scheduler function. Defaults to None.
+            verbose (bool, optional): _description_. Defaults to True.
+            test_interval (int, optional): _description_. Defaults to 5.
+
+        Returns:
+            dict: metrics on the test set
+        """
+        optimizer_class = optimizer(self.model_class.parameters(), lr=lr)
+        optimizer_expert = optimizer(self.model_expert.parameters(), lr=lr)
+        if scheduler is not None:
+            scheduler_class = scheduler(optimizer_class, len(dataloader_train) * epochs)
+            scheduler_expert = scheduler(
+                optimizer_expert, len(dataloader_train) * epochs
+            )
+        best_acc = 0
+        # store current model dict
+        best_model = [copy.deepcopy(self.model_class.state_dict()), copy.deepcopy(self.model_expert.state_dict())]
+        for epoch in tqdm(range(epochs)):
+            self.fit_epoch_class(
+                dataloader_train, optimizer_class, verbose=verbose, epoch=epoch
+            )
+            self.fit_epoch_expert(
+                dataloader_train, optimizer_expert, verbose=verbose, epoch=epoch
+            )
+            if epoch % test_interval == 0 and epoch > 1:
+                data_test = self.test(dataloader_val, costs)
+                val_metrics = compute_deferral_metrics(data_test)
+                if val_metrics["classifier_all_acc"] >= best_acc: 
+                    best_acc = val_metrics["classifier_all_acc"]
+                    best_model = [copy.deepcopy(self.model_class.state_dict()), copy.deepcopy(self.model_expert.state_dict())]
+
+            if scheduler is not None:
+                scheduler_class.step()
+                scheduler_expert.step()
+        self.model_class.load_state_dict(best_model[0])
+        self.model_expert.load_state_dict(best_model[1])
+
+        return compute_deferral_metrics(self.test(dataloader_test, costs))
+    
+    def is_defer(outputs_expert, outputs_class, costs):
+        '''Decides whether to defer or not based on output of the expert, outputs of the classifier, and the costs'''
+        # TODO: COMPLETE THIS
+        pass
+    
         
 
             

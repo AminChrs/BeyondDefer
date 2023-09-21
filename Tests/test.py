@@ -704,12 +704,12 @@ def test_costy_deferral():
         dataset.data_train_loader,
         dataset.data_val_loader,
         dataset.data_test_loader,
-        epochs=100,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        lr=0.001,
+        100,
+        optimizer,
+        0.001,
         c=0.1,
-        verbose=False,
+        scheduler=scheduler,
+        verbose=True,
         test_interval=1,
     )
     test_data = CC.test(dataset.data_test_loader, 0.1)

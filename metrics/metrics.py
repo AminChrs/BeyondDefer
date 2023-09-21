@@ -3,7 +3,7 @@ import sklearn.metrics
 import copy
 import logging
 
-def compute_deferral_metrics_costy(data_test):
+def compute_deferral_metrics_costy(data_test, loss_fn):
     """_summary_
 
     Args:
@@ -40,7 +40,12 @@ def compute_deferral_metrics_costy(data_test):
         data_test["labels"],
     )
     # get system loss
-    # TODO: find system loss
-    results["system_loss"] = 0
+    n_data = data_test["preds"].shape[0]
+    data_concat = np.concatenate([np.reshape(data_test["labels"], (n_data, 1)),
+                                  np.reshape(data_test["hum_preds"], (n_data, 1)),
+                                  np.reshape(data_test["preds"], (n_data, 1)),
+                                  np.reshape(data_test["defers"], (n_data, 1))], axis=1)    
+    results["system_loss"] = np.sum(np.apply_along_axis(loss_fn, 1, data_concat))
+    
     
     return results

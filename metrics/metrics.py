@@ -2,8 +2,11 @@ import numpy as np
 import sklearn.metrics
 import copy
 import logging
+import sys
 
-def compute_deferral_metrics_costy(data_test, loss_fn):
+sys.path.append("..")
+
+def compute_deferral_metrics_cost_sensitive(data_test, loss_fn):
     """_summary_
 
     Args:

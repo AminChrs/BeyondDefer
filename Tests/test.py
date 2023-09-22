@@ -9,8 +9,9 @@ from human_ai_deferral.helpers.metrics import compute_coverage_v_acc_curve
 from human_ai_deferral.baselines.compare_confidence import CompareConfidence
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
-from MyMethod.costy_defer import CostyDeferral
+from MyMethod.costy_defer import CompareConfidenceCostSensitive
 from human_ai_deferral.networks.cnn import NetSimple
+from Metrics.metrics import compute_deferral_metrics_cost_sensitive
 #from metrics.metrics import plot_cov_vs_acc
 import torch
 import numpy as np
@@ -690,32 +691,44 @@ def test_RS_Hatespeech():
     
     print("Test RS on HateSpeech fit passed!")
     
-def test_costy_deferral(): 
+def test_CC_cost_sensitive_deferral(): 
     # image
     dataset = HateSpeech("../data/", True, False, 'random_annotator', device)
     
     # models
     model = networks("hatespeech", "confidence", device)
     # CC
+    # TODO: Write the loss function
+    def loss_fn(data):
+        label = data[0]
+        hum_pred = data[1]
+        pred = data[2]
+        defer = data[3]
+        
+        # return (1-defer) * int(label!=pred) + defer * (1 + int(label!=hum_pred))
+        return (1-defer) * int(label!=pred) + defer * (int(label!=hum_pred))
+    
     model_class, model_expert = networks("hatespeech", "confidence", device)
-    CC = CostyDeferral(CompareConfidence, model_class, model_expert, device)
+    CC = CompareConfidenceCostSensitive(model_class, model_expert, device)
     optimizer, scheduler = optimizer_scheduler()
     CC.fit(
         dataset.data_train_loader,
         dataset.data_val_loader,
         dataset.data_test_loader,
-        100,
-        optimizer,
-        0.001,
-        c=0.1,
+        epochs=100,
+        optimizer=optimizer,
+        lr=0.001,
+        loss_fn=loss_fn,
         scheduler=scheduler,
         verbose=True,
         test_interval=1,
     )
-    test_data = CC.test(dataset.data_test_loader, 0.1)
+    test_data = CC.test(dataset.data_test_loader, loss_fn)
+    #print(test_data)
+    print(compute_deferral_metrics_cost_sensitive(test_data, loss_fn))
     res_CC = compute_coverage_v_acc_curve(test_data)
     
-    print("Test CC on HateSpeech fit with costy deferral passed!")
+    print("Test CC on HateSpeech fit with cost sensitive deferral passed!")
     
     # import inspect
     # code, line_no = inspect.getsourcelines(modified_class.fit_epoch_expert)
@@ -744,5 +757,5 @@ if __name__ == "__main__":
     # test_RS_Imagenet()
     # test_BD_Hatespeech()
     # test_RS_Hatespeech()
-    test_costy_deferral()
+    test_CC_cost_sensitive_deferral()
     logging.info("All tests passed!")

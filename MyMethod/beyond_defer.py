@@ -3,11 +3,8 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 import time
-import sys
 import logging
 from tqdm import tqdm
-
-sys.path.append("..")
 from human_ai_deferral.helpers.utils import AverageMeter, accuracy
 from human_ai_deferral.helpers.metrics import compute_metalearner_metrics
 from human_ai_deferral.baselines.basemethod import BaseMethod
@@ -47,11 +44,6 @@ class BeyondDefer(BaseMethod):
          hum_preds == target
         labels: target
         """
-        human_correct = (m == data_y).float()
-        if (not isinstance(human_correct, torch.Tensor)):
-            human_correct = torch.tensor(human_correct).to(self.device)
-        else:
-            human_correct = human_correct.to(self.device)
 
         batch_size = out_class.size()[0]
         l1 = self.LossOVA(out_class[range(batch_size), data_y], 1)
@@ -70,7 +62,30 @@ class BeyondDefer(BaseMethod):
         ) - self.LossOVA(outputs_sim[range(batch_size), m], -1)
 
         loss_final = l1 + l2 + l3 + l4 + l5 + l6
+        if torch.isnan(loss_final).any():
+            ls = [l1, l2, l3, l4, l5, l6]
+            for i, l in enumerate(ls):
+                if torch.isnan(l).any():
+                    print("loss l", i, " has nan")
         return torch.mean(loss_final)
+
+    def LossBCE(self, outputs, y):
+        num_classes = outputs.size()[1]
+        y_oh = F.one_hot(y, num_classes=num_classes).float()
+        return F.binary_cross_entropy_with_logits(outputs, y_oh,
+                                                  reduction='none').sum(dim=1)
+
+    def surrogate_loss_bce(self, out_class, outputs_sim, outputs_meta, m,
+                           data_y):
+        """
+        outputs: network outputs
+        m: cost of deferring to expert cost of classifier predicting
+         hum_preds == target
+        labels: target
+        """
+        return (self.LossBCE(out_class, data_y)
+                + self.LossBCE(outputs_sim, m)
+                + self.LossBCE(outputs_meta, data_y)).mean()
 
     def fit_epoch(self, dataloader, n_classes, optimizer, verbose=False,
                   epoch=1):
@@ -109,8 +124,8 @@ class BeyondDefer(BaseMethod):
             outputs_meta = self.model_meta(data_x, one_hot_m)
             outputs_sim = self.model_sim(data_x)
 
-            loss = self.surrogate_loss(outputs_classifier, outputs_sim,
-                                       outputs_meta, hum_preds, data_y)
+            loss = self.surrogate_loss_bce(outputs_classifier, outputs_sim,
+                                           outputs_meta, hum_preds, data_y)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -162,7 +177,7 @@ class BeyondDefer(BaseMethod):
         lr,
         scheduler=None,
         verbose=True,
-        test_interval=5,
+        test_interval=1,
     ):
         params = list(self.model_classifier.parameters()) + \
                         list(self.model_sim.parameters()) + \

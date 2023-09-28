@@ -20,7 +20,7 @@ def optimizer_scheduler():
         return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
 
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
-                                                       weight_decay=0.0005)
+                                                       )
     return optimizer, scheduler
 
 
@@ -73,6 +73,13 @@ def networks(dataset_name, method, device):
                                  [1, 20, 1],
                                  remove_layers=["fc3", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
+        if method == "Additional":
+            model_classifier = NetSimple(11, 50, 50, 100, 20).to(device)
+            model_human = NetSimple(10, 50, 50, 100, 20).to(device)
+            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_human, model_meta
         elif method == "AFE":
             model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
             model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
@@ -92,17 +99,27 @@ def networks(dataset_name, method, device):
     elif dataset_name == "cifar_10h":
         if method == "BD":
             model_classifier = model_cifarh(10, device,
-                                            "../models/cifar10h.pt")
+                                            "./models/cifar10h.pt")
             model_human = model_cifarh(10, device,
-                                       "../models/cifar10h.pt")
+                                       "./models/cifar10h.pt")
             model_meta = MetaNet(10, model_cifarh(10, device,
-                                                  "../models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt"),
+                                 [1, 50, 1],
+                                 remove_layers=["fc2", "softmax"]).to(device)
+            return model_classifier, model_human, model_meta
+        if method == "Additional":
+            model_classifier = model_cifarh(11, device,
+                                            "./models/cifar10h.pt")
+            model_human = model_cifarh(10, device,
+                                       "./models/cifar10h.pt")
+            model_meta = MetaNet(10, model_cifarh(10, device,
+                                                  "./models/cifar10h.pt"),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
         elif method == "AFE":
             model_classifier = model_cifarh(10, device,
-                                            "../models/cifar10h_classifier.pt")
+                                            "./models/cifar10h_classifier.pt")
             model_meta = MetaNet(10, model_cifarh(10, device, "../models/\
                                                     cifar10h_classifier.pt"),
                                  [1, 50, 1],
@@ -110,19 +127,26 @@ def networks(dataset_name, method, device):
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
             model_classifier = model_cifarh(10, device,
-                                            "../models/cifar10h.pt")
+                                            "./models/cifar10h.pt")
             model_expert = model_cifarh(2, device,
-                                        "../models/cifar10h.pt")
+                                        "./models/cifar10h.pt")
             return model_classifier, model_expert
         elif method == "selective":
-            model = model_cifarh(10, device, "../models/cifar10h.pt")
+            model = model_cifarh(10, device, "./models/cifar10h.pt")
             return model
         else:
-            model = model_cifarh(11, device, "../models/cifar10h.pt")
+            model = model_cifarh(11, device, "./models/cifar10h.pt")
             return model
     elif dataset_name == "imagenet":
         if method == "BD":
             model_classifier = model_imagenet(16, device)
+            model_human = model_imagenet(16, device)
+            model_meta = MetaNet(16, model_imagenet(16, device),
+                                 [1, 1024, 1],
+                                 remove_layers=["densenet121.classifier"]).to(device)
+            return model_classifier, model_human, model_meta
+        if method == "Additional":
+            model_classifier = model_imagenet(17, device)
             model_human = model_imagenet(16, device)
             model_meta = MetaNet(16, model_imagenet(16, device),
                                  [1, 1024, 1],
@@ -145,18 +169,24 @@ def networks(dataset_name, method, device):
             model = model_imagenet(17, device)
             return model
     elif dataset_name == "hatespeech":
-        if os.path.exists("../data/hatespeech-dim.npz"):
-            dim = np.load("../data/hatespeech-dim.npz")
+        if os.path.exists("./data/hatespeech-dim.npz"):
+            dim = np.load("./data/hatespeech-dim.npz")
             d = dim["d"]
         else:
-            dataset = HateSpeech("../data", True, False,
+            dataset = HateSpeech("./data", True, False,
                                  'random_annotator', device)
             d = dataset.d
 
-            np.savez("../data/hatespeech-dim.npz", d=d)
+            np.savez("./data/hatespeech-dim.npz", d=d)
 
         if method == "BD":
             model_classifier = LinearNet(d, 3).to(device)
+            model_human = LinearNet(d, 3).to(device)
+            model_meta = MetaNet(3, LinearNet(d, 10),
+                                 [1, 10, 1]).to(device)
+            return model_classifier, model_human, model_meta
+        if method == "Additional":
+            model_classifier = LinearNet(d, 4).to(device)
             model_human = LinearNet(d, 3).to(device)
             model_meta = MetaNet(3, LinearNet(d, 10),
                                  [1, 10, 1]).to(device)

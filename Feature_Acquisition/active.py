@@ -1,10 +1,6 @@
 # In this file, I am finding a thresholding over the D(P(Y|X), P(Y|X, M))
 # Based on which I decide whether to collect the human feature or not
 # Afterwards, I update my belief about the human label and re-train the model
-# The threshold is found via a grid search in validation set
-import sys
-sys.path.append("../")
-sys.path.append("../human_ai_deferral")
 import copy
 import torch
 from human_ai_deferral.datasetsdefer.basedataset import BaseDataset
@@ -102,7 +98,7 @@ class ActiveDataset(BaseDataset):
             indices_query = torch.tensor([indices_query])
         return indices_query
 
-    def Query(self, criterion, pool_size=100, batch_size=128, query_size=10,
+    def Query(self, criterion, pool_size=100, batch_size=512, query_size=10,
               ):
         indices_query = self.indices_Query(criterion, "train", pool_size,
                                            batch_size, query_size)
@@ -154,8 +150,14 @@ class ActiveDataset(BaseDataset):
             loss += loss_criterion(x, hum_pred, y, defer=False)
             loss_no_defer += loss_criterion(x, hum_pred, y, defer=False)
         loss = loss/len_test
-        loss_defer = loss_defer/size
-        loss_no_defer = loss_no_defer/(len_test-size)
+        if size == 0:
+            loss_defer = 0.0
+        else:
+            loss_defer = loss_defer/size
+        if size == len_test:
+            loss_no_defer = 0.0
+        else:
+            loss_no_defer = loss_no_defer/(len_test-size)
         return loss, loss_defer, loss_no_defer
 
 
@@ -442,7 +444,7 @@ class AFE(BaseMethod):
             test_interval=5,
             query_size=1,
             num_queries=100,
-            optimizer = None):
+            optimizer=None):
 
         """Fit the classifier, then find the KL divergence between each
          unlabeled points and all the labeled ones, and pick the highest
@@ -469,10 +471,8 @@ class AFE(BaseMethod):
         params_class = list(self.model_classifier.parameters())
         params_meta = list(self.model_meta.parameters())
         if optimizer is None:
-            optimizer_classifier = torch.optim.Adam(params_class, lr=lr,
-                                                    weight_decay=5e-4)
-            optimizer_meta = torch.optim.Adam(params_meta, lr=lr,
-                                            weight_decay=5e-4)
+            optimizer_classifier = torch.optim.Adam(params_class, lr=lr)
+            optimizer_meta = torch.optim.Adam(params_meta, lr=lr)
         else:
             optimizer_classifier = optimizer(params_class, lr=lr)
             optimizer_meta = optimizer(params_meta, lr=lr)

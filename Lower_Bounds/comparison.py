@@ -102,8 +102,11 @@ def calculate_h_y_m(y_m_joint_dist):
 
 def calculate_defer_lower_bound(y_m_list, h_y_x_list, total, n_classes):
     defer_bound = n_classes
-    for i in range(total ** 2):
+    #for i in range(total ** 2):
+    for i in range(10000):
         # generating a random defer
+        # if i%50 == 0:
+        #     print(i)
         r = np.random.randint(0, 2, total)
         p_defer = np.sum(r)/r.shape[0]
         h_y_x_selected = h_y_x_list[r==0]
@@ -111,13 +114,14 @@ def calculate_defer_lower_bound(y_m_list, h_y_x_list, total, n_classes):
         
         y_m_selected = y_m_list[r==1]
         y_m_joint_dist = np.zeros((n_classes, n_classes))
-        for y, m in y_m_selected:
-            y_m_joint_dist[y, m] += 1
+        for y_m in y_m_selected:
+            y_m_joint_dist[int(y_m[0]), int(y_m[1])] += 1
         
         h_y_m = calculate_h_y_m(y_m_joint_dist)
         defer_bound_temp = h_y_m * p_defer + h_y_x * (1 - p_defer)
         if defer_bound_temp < defer_bound:
             defer_bound = defer_bound_temp
+    #print(defer_bound)
     return defer_bound 
         
         
@@ -135,9 +139,9 @@ if __name__ == '__main__':
     print("hi")
     for k in k_range:
         dataset = CifarSynthDataset(k, False, batch_size=512)
-        res_pack = lower_bound_experiment(dataset, "cifar_synth", 1, 10, device,
+        res_pack = lower_bound_experiment(dataset, "cifar_synth", 80, 10, device,
                                       subsample=False, iter=0)
-        print(res_pack)
+        #print(res_pack)
         res.append(res_pack)
     res = list(res)
     filename = "bounds_vs_k.png"

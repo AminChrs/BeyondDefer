@@ -246,8 +246,13 @@ class BeyondDefer(BaseMethod):
                 one_hot_m = one_hot_m.to(self.device)
 
                 outputs_classifier = F.sigmoid(self.model_classifier(data_x))
+                # normalize
+                outputs_classifier /= torch.sum(outputs_classifier, axis=1).\
+                    unsqueeze(1)
                 outputs_meta = F.sigmoid(self.model_meta(data_x, one_hot_m))
+                outputs_meta /= torch.sum(outputs_meta, axis=1).unsqueeze(1)
                 outputs_sim = F.sigmoid(self.model_sim(data_x))
+                outputs_sim /= torch.sum(outputs_sim, axis=1).unsqueeze(1)
 
                 prob_classifier, pred_classifier = \
                     torch.max(outputs_classifier.data, 1)

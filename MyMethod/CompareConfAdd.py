@@ -8,14 +8,14 @@ from tqdm import tqdm
 from human_ai_deferral.helpers.utils import AverageMeter, accuracy
 from human_ai_deferral.helpers.metrics import compute_additional_defer_metrics
 from human_ai_deferral.baselines.basemethod import BaseMethod
-
+#  This file is unfinished and not used in the paper
 eps_cst = 1e-8
 
 
-class AdditionalBeyond(BaseMethod):
+class CompareConfAdd(BaseMethod):
     def __init__(self, plotting_interval, model_classifier,
-                 model_sim, model_meta, device,
-                 learnable_threshold_rej=False):
+                 model_sim, model_meta, model_defer, model_defer_meta,
+                 device, learnable_threshold_rej=False):
         '''
         plotting_interval (int): used for plotting model training in fit_epoch
         model_classifier (pytorch model): model used for surrogate
@@ -35,56 +35,6 @@ class AdditionalBeyond(BaseMethod):
         loss_out = torch.log2(1 + torch.exp((-1 * y) * outputs + eps_cst)
                               + eps_cst)
         return loss_out
-
-    def surrogate_loss(self, out_class, outputs_sim, outputs_meta, m,
-                       data_y):
-        """
-        outputs: network outputs
-        m: cost of deferring to expert cost of classifier predicting
-         hum_preds == target
-        labels: target
-        """
-        human_correct = (m == data_y).float()
-        if (not isinstance(human_correct, torch.Tensor)):
-            human_correct = torch.tensor(human_correct).to(self.device)
-        else:
-            human_correct = human_correct.to(self.device)
-
-        batch_size = out_class.size()[0]
-        l1 = self.LossOVA(out_class[range(batch_size), data_y], 1)
-        l2 = torch.sum(
-            self.LossOVA(out_class[range(batch_size), :-1], -1), dim=1
-        ) - self.LossOVA(out_class[range(batch_size), data_y], -1)
-
-        l3 = self.LossOVA(outputs_meta[range(batch_size), data_y], 1)
-        l4 = torch.sum(
-            self.LossOVA(outputs_meta[range(batch_size), :], -1), dim=1
-        ) - self.LossOVA(outputs_meta[range(batch_size), data_y], -1)
-
-        l5 = self.LossOVA(outputs_sim[range(batch_size), m], 1)
-        l6 = torch.sum(
-            self.LossOVA(outputs_sim[range(batch_size), :], -1), dim=1
-        ) - self.LossOVA(outputs_sim[range(batch_size), m], -1)
-
-        l7 = self.LossOVA(out_class[range(batch_size), -1], -1)
-        l8 = self.LossOVA(out_class[range(batch_size), -1], 1)
-
-        l9 = human_correct * (l8 - l7)
-
-        loss_final = l1 + l2 + l3 + l4 + l5 + l6 + l7 + l9
-        if torch.isnan(loss_final).any():
-            ls = [l1, l2, l3, l4, l5, l6, l7, l8, l9]
-            for i, l in enumerate(ls):
-                if torch.isnan(l).any():
-                    logging.info("loss l{} has nan".format(i+1))
-                    logging.info("loss_final: {}".format(loss_final))
-                    logging.info("l6 first part: {}".format(
-                        self.LossOVA(outputs_sim[range(batch_size), :], -1)))
-                    logging.info("l6 second part: {}".format(
-                        self.LossOVA(outputs_sim[range(batch_size), m], -1)))
-                    logging.info("outputs_sim: {}".format(
-                        outputs_sim[range(batch_size), :]))
-        return torch.mean(loss_final)
 
     def LossBCEH(self, outputs, y, m):
         num_classes = outputs.size()[1]
@@ -111,20 +61,6 @@ class AdditionalBeyond(BaseMethod):
                 + self.LossBCE(outputs_sim, m)
                 + self.LossBCE(outputs_meta, data_y)).mean()
 
-    def Loss_single(self, output, data_y):
-        """
-        outputs: network outputs
-        m: cost of deferring to expert cost of classifier predicting
-         hum_preds == target
-        labels: target
-        """
-        batch_size = output.size()[0]
-        l1 = self.LossOVA(output[range(batch_size), data_y], 1)
-        l2 = torch.sum(
-            self.LossOVA(output[range(batch_size), :], -1), dim=1
-        ) - self.LossOVA(output[range(batch_size), data_y], -1)
-        return l1 + l2
-
     def fit_epoch(self, dataloader, n_classes, optimizer, verbose=False,
                   epoch=1):
         """
@@ -149,11 +85,6 @@ class AdditionalBeyond(BaseMethod):
             data_x = data_x.to(self.device)
             data_y = data_y.to(self.device)
             hum_preds = hum_preds.to(self.device)
-
-            # TODO: Check if hum_preds is one-hot or not (probably not)
-            # print("shape of hum_preds: ", hum_preds.shape)
-            # Convert to one-hot
-
             one_hot_m = torch.zeros((data_x.size()[0], n_classes))
             one_hot_m[torch.arange(data_x.size()[0]), hum_preds] = 1
             one_hot_m = one_hot_m.to(self.device)

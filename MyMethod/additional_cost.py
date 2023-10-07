@@ -12,9 +12,9 @@ from human_ai_deferral.baselines.basemethod import BaseMethod
 eps_cst = 1e-8
 
 
-class AdditionalBeyond(BaseMethod):
+class AdditionalCost(BaseMethod):
     def __init__(self, plotting_interval, model_classifier,
-                 model_sim, model_meta, device,
+                 model_sim, model_meta, device, loss_matrix,
                  learnable_threshold_rej=False):
         '''
         plotting_interval (int): used for plotting model training in fit_epoch
@@ -29,67 +29,17 @@ class AdditionalBeyond(BaseMethod):
         self.device = device
         self.threshold_rej = 0
         self.learnable_threshold_rej = learnable_threshold_rej
-
-    def LossOVA(self, outputs, y):
-        # outputs[torch.where(outputs == 0.0)] = (-1 * y) * (-1 * np.inf)
-        loss_out = torch.log2(1 + torch.exp((-1 * y) * outputs + eps_cst)
-                              + eps_cst)
-        return loss_out
-
-    def surrogate_loss(self, out_class, outputs_sim, outputs_meta, m,
-                       data_y):
-        """
-        outputs: network outputs
-        m: cost of deferring to expert cost of classifier predicting
-         hum_preds == target
-        labels: target
-        """
-        human_correct = (m == data_y).float()
-        if (not isinstance(human_correct, torch.Tensor)):
-            human_correct = torch.tensor(human_correct).to(self.device)
-        else:
-            human_correct = human_correct.to(self.device)
-
-        batch_size = out_class.size()[0]
-        l1 = self.LossOVA(out_class[range(batch_size), data_y], 1)
-        l2 = torch.sum(
-            self.LossOVA(out_class[range(batch_size), :-1], -1), dim=1
-        ) - self.LossOVA(out_class[range(batch_size), data_y], -1)
-
-        l3 = self.LossOVA(outputs_meta[range(batch_size), data_y], 1)
-        l4 = torch.sum(
-            self.LossOVA(outputs_meta[range(batch_size), :], -1), dim=1
-        ) - self.LossOVA(outputs_meta[range(batch_size), data_y], -1)
-
-        l5 = self.LossOVA(outputs_sim[range(batch_size), m], 1)
-        l6 = torch.sum(
-            self.LossOVA(outputs_sim[range(batch_size), :], -1), dim=1
-        ) - self.LossOVA(outputs_sim[range(batch_size), m], -1)
-
-        l7 = self.LossOVA(out_class[range(batch_size), -1], -1)
-        l8 = self.LossOVA(out_class[range(batch_size), -1], 1)
-
-        l9 = human_correct * (l8 - l7)
-
-        loss_final = l1 + l2 + l3 + l4 + l5 + l6 + l7 + l9
-        if torch.isnan(loss_final).any():
-            ls = [l1, l2, l3, l4, l5, l6, l7, l8, l9]
-            for i, l in enumerate(ls):
-                if torch.isnan(l).any():
-                    logging.info("loss l{} has nan".format(i+1))
-                    logging.info("loss_final: {}".format(loss_final))
-                    logging.info("l6 first part: {}".format(
-                        self.LossOVA(outputs_sim[range(batch_size), :], -1)))
-                    logging.info("l6 second part: {}".format(
-                        self.LossOVA(outputs_sim[range(batch_size), m], -1)))
-                    logging.info("outputs_sim: {}".format(
-                        outputs_sim[range(batch_size), :]))
-        return torch.mean(loss_final)
+        self.loss_matrix = loss_matrix.to(device)
 
     def LossBCEH(self, outputs, y, m):
-        num_classes = outputs.size()[1]
+        num_classes = outputs.size()[1] - 1
         y_oh = F.one_hot(y, num_classes=num_classes).float()
-        y_oh[:, -1] = (m == y).float()
+        m_oh = F.one_hot(m, num_classes=num_classes).float()
+        is_loss = torch.matmul(torch.matmul(y_oh, self.loss_matrix),
+                               m_oh.transpose(0, 1))
+        is_loss = torch.diag(is_loss)
+        y_oh = F.one_hot(y, num_classes=num_classes + 1).float()
+        y_oh[:, -1] = (1 - is_loss).float()
         return F.binary_cross_entropy_with_logits(outputs, y_oh,
                                                   reduction='none').sum(dim=1)
 
@@ -297,8 +247,12 @@ class AdditionalBeyond(BaseMethod):
                             self.model_classifier(data_x)[:, n_classes])
 
                 prob_classifier, pred_classifier = \
-                    torch.max(outputs_classifier.data, 1)
-                _, pred_meta = torch.max(outputs_meta.data, 1)
+                    torch.max(1 - torch.matmul(outputs_classifier.data,
+                                               self.loss_matrix),
+                              1)
+                _, pred_meta = torch.max(1 - torch.matmul(outputs_meta.data,
+                                                          self.loss_matrix),
+                                         1)
                 prob_posthoc = torch.zeros((hum_preds.size(0))).to(self.device)
 
                 for j in range(n_classes):
@@ -308,7 +262,10 @@ class AdditionalBeyond(BaseMethod):
 
                     outputs_meta_j = F.sigmoid(self.model_meta(data_x,
                                                                one_hot_j))
-                    prob_meta_j, _ = torch.max(outputs_meta_j.data, 1)
+                    prob_meta_j, _ = \
+                        torch.max(1 - torch.matmul(outputs_meta_j.data,
+                                                   self.loss_matrix),
+                                  1)
                     prob_posthoc += outputs_sim[:, j] * prob_meta_j
 
                 _, rejector = torch.max(torch.stack(

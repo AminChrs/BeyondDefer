@@ -8,18 +8,21 @@ from metrics.metrics import aggregate_plots
 import warnings
 import numpy as np
 import torch
+import logging
 warnings.filterwarnings("ignore")
 # Device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def acc_cov_init():
-    methods = ["Beyond Defer", "Additional Beyond Defer",
+    methods = ["Additional Beyond Defer",
+               "Learn Additional Defer", "Compare Confidences Additional",
                "Reallizable Surrogate", "Compare Confindences",
                "One-versus-All", "Cross Entropy"]
     datasets = ["cifar", "cifar10h", "hatespeech", "imagenet"]
     res_dir = "./Results/loss_vs_cov/"
-    epochs = [150, 150, 150, 150]
+    epochs = [30, 30, 30, 30]
+    # epochs = [1, 1, 1, 1]
     return return_res(methods=methods, res_dir=res_dir, epochs=epochs,
                       datasets=datasets)
 
@@ -68,10 +71,13 @@ def acc_cov_loop(res, iter):
 
 
 def acc_cov_conc(cls, res):
+    logging.info("Concluding...")
     x_out = np.arange(0, 1, 0.01)
     for dataset in res[0].datasets:
         Res_methods = []
         for j in range(len(res[0].methods)):
+            logging.info("Method: {}".format(res[0].methods[j]))
+            logging.info("Dataset: {}".format(dataset))
             accs = []
             covs = []
             Res = []
@@ -82,9 +88,16 @@ def acc_cov_conc(cls, res):
                           in res[i].results[dataset][j]]
                 accs.append(accs_i[1:])
                 covs.append(covs_i[1:])
-            accs_o = aggregate_plots(covs, accs, x_out, method="avg")
+            # find maximum accuracy
+            logging.info("Dataset: {}, Method: {}".format(dataset,
+                                                          res[0].methods[j]))
+            accs_o, accs_std = aggregate_plots(covs, accs, x_out, method="avg")
+            max_acc = np.max(accs_o)
+            # round to 3 decimals
+            max_acc = np.round(max_acc, 3)
             for i in range(len(accs_o)):
-                Res.append({"system_acc": accs_o[i], "coverage": x_out[i]})
+                Res.append({"system_acc": accs_o[i], "coverage": x_out[i],
+                            "std_acc": accs_std[i]})
             Res_methods.append(Res)
         filename = res[0].res_dir + dataset + ".pdf"
         plot_cov_vs_acc(Res_methods, res[0].methods, filename)

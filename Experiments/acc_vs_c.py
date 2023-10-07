@@ -8,23 +8,27 @@ from metrics.metrics import aggregate_plots
 import warnings
 import numpy as np
 import torch
+# import logging
 warnings.filterwarnings("ignore")
 # Device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def acc_cov_init():
-    methods = ["Beyond Defer", "Additional Beyond Defer",
-               "Reallizable Surrogate", "Compare Confindences",
-               "One-versus-All", "Cross Entropy"]
+def acc_c_init():
+    methods = ["Additional Beyond Defer",
+               "Learn Additional Defer", "Compare Confidences Additional",
+               "Compare Confindences",
+               "One-versus-All", "Cross Entropy"]  
     datasets = ["cifar", "cifar10h", "hatespeech", "imagenet"]
-    res_dir = "./Results/loss_vs_cov/"
-    epochs = [1, 1, 1, 1]  # [150, 150, 150, 150]
+    res_dir = "./Results/loss_vs_c/"
+    # epochs = [150, 150, 150, 150]
+    # epochs = [1, 1, 1, 1]
+    epochs = [30, 30, 30, 30]
     return return_res(methods=methods, res_dir=res_dir, epochs=epochs,
                       datasets=datasets)
 
 
-def acc_cov_loop(res, iter):
+def acc_c_loop(res, iter):
 
     results = {}
     # Cifar
@@ -71,12 +75,13 @@ def acc_cov_loop(res, iter):
                       res_dir=res.res_dir)
 
 
-def acc_cov_conc(cls, res):
+def acc_c_conc(cls, res):
     x_out = np.arange(0, 1, 0.01)
     for dataset in res[0].datasets:
         Res_methods = []
         for j in range(len(res[0].methods)):
             accs = []
+            cs = []
             covs = []
             Res = []
             for i in range(len(res)):
@@ -84,20 +89,34 @@ def acc_cov_conc(cls, res):
                           in res[i].results[dataset][j]]
                 covs_i = [m["coverage"] for m
                           in res[i].results[dataset][j]]
+                c_i = np.arange(0, 1, 1 / len(accs_i))
                 accs.append(accs_i[1:])
+                cs.append(c_i[1:])
                 covs.append(covs_i[1:])
-            accs_o = aggregate_plots(covs, accs, x_out, method="avg")
+            covs = np.array(covs)
+            covs_avg = np.mean(covs, axis=0)
+            if len(res) == 1:
+                accs_o = accs[0]
+                accs_std = np.zeros(len(accs_o))
+                x_out = cs[0]
+            else:
+                accs_o, accs_std = aggregate_plots(cs, accs, x_out,
+                                                   method="avg")
+            loss = 1 - np.array(accs_o) + (1 - np.array(covs_avg))*x_out
             for i in range(len(accs_o)):
-                Res.append({"system_acc": accs_o[i], "coverage": x_out[i]})
+                Res.append({"system_acc": accs_o[i], "c": x_out[i],
+                            "coverage": covs_avg[i], "loss": loss[i],
+                            "std_acc": accs_std[i]})
             Res_methods.append(Res)
         filename = res[0].res_dir + dataset + ".pdf"
-        plot_cov_vs_acc(Res_methods, res[0].methods, filename)
+        plot_cov_vs_acc(Res_methods, res[0].methods, filename, method="c",
+                        is_loss=True)
 
 
 def acc_c_parallel(iter):
-    Parallel = experiment_parallel(acc_cov_loop,
-                                   acc_cov_init,
-                                   acc_cov_conc,
+    Parallel = experiment_parallel(acc_c_loop,
+                                   acc_c_init,
+                                   acc_c_conc,
                                    10,
                                    "data/acc_vs_c/")
-    Parallel.run(parallel=False, iter=iter)
+    Parallel.run(parallel=True, iter=iter)

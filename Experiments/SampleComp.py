@@ -59,6 +59,7 @@ def plot_sample(samples, results, methods, filename):
 def SampleComp_init():
     # methods
     methods = ["Beyond Defer", "Additional Defer",
+               "Learned Beyond",
                "Reallizable Surrogate", "Compare Confindences",
                "One-versus-All", "Cross Entropy"]
     res_dir = "Results/SampleComp/"

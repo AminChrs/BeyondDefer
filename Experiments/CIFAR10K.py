@@ -45,7 +45,8 @@ def plot_res_vs_k(results, methods, filename, k_range):
 
 def CIFAR10K_init():
     k_range = np.arange(1, 10)
-    methods = ["Beyond Defer", "Additional Beyond Defer",
+    methods = ["Additional Beyond Defer",
+               "Learned Additional Beyond", "Compare Confidences Additional",
                "Reallizable Surrogate", "Compare Confindences",
                "One-versus-All", "Cross Entropy"]
     res = []

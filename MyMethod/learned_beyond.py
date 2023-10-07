@@ -29,13 +29,21 @@ class LearnedBeyond(BaseMethod):
         self.threshold_rej = 0
         self.learnable_threshold_rej = learnable_threshold_rej
 
+    def LossBCEH(self, outputs, y, outputs_meta):
+        num_classes = outputs.size()[1]
+        y_oh = F.one_hot(y, num_classes=num_classes).float()
+        m = torch.argmax(outputs_meta, dim=1).float()
+        y_oh[:, -1] = (m == y).float()
+        return F.binary_cross_entropy_with_logits(outputs, y_oh,
+                                                  reduction='none').sum(dim=1)
+
     def LossBCE(self, outputs, y):
         num_classes = outputs.size()[1]
         y_oh = F.one_hot(y, num_classes=num_classes).float()
         return F.binary_cross_entropy_with_logits(outputs, y_oh,
                                                   reduction='none').sum(dim=1)
 
-    def surrogate_loss_bce(self, out_class, outputs_meta, m,
+    def surrogate_loss_bce(self, out_class, outputs_meta,
                            data_y):
         """
         outputs: network outputs
@@ -43,7 +51,7 @@ class LearnedBeyond(BaseMethod):
          hum_preds == target
         labels: target
         """
-        return (self.LossBCE(out_class, data_y)
+        return (self.LossBCEH(out_class, data_y, outputs_meta)
                 + self.LossBCE(outputs_meta, data_y)).mean()
 
     def fit_epoch(self, dataloader, n_classes, optimizer, verbose=False,
@@ -81,13 +89,13 @@ class LearnedBeyond(BaseMethod):
             outputs_meta = self.model_meta(data_x, one_hot_m)
 
             loss = self.surrogate_loss_bce(outputs_classifier,
-                                           outputs_meta, hum_preds, data_y)
+                                           outputs_meta, data_y)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            prec1_classifier = accuracy(outputs_classifier.data, data_y,
-                                        topk=(1,))[0]
+            prec1_classifier = accuracy(outputs_classifier.data[:, :-1],
+                                        data_y, topk=(1,))[0]
             prec1_meta = accuracy(outputs_meta.data, data_y, topk=(1,))[0]
             losses.update(loss.data.item(), data_x.size(0))
             top1_classifier.update(prec1_classifier.item(), data_x.size(0))
@@ -174,9 +182,9 @@ class LearnedBeyond(BaseMethod):
         defers_all = []
         truths_all = []
         meta_preds_all = []
-        predictions_all = []  # classifier only
-        rej_score_all = []  # rejector probability
-        class_probs_all = []  # classifier probability
+        predictions_all = []
+        rej_score_all = []
+        class_probs_all = []
         self.model_classifier.eval()
         self.model_meta.eval()
 
@@ -192,23 +200,18 @@ class LearnedBeyond(BaseMethod):
                 one_hot_m[torch.arange(data_x.size()[0]), hum_preds] = 1
                 one_hot_m = one_hot_m.to(self.device)
 
-                outputs_classifier = F.sigmoid(self.model_classifier(data_x))
+                outputs_classifier = F.sigmoid(self.model_classifier(data_x)
+                                               [:, :n_classes])
+                outputs_classifier /= torch.sum(outputs_classifier, dim=1,
+                                                keepdim=True)
                 outputs_meta = F.sigmoid(self.model_meta(data_x, one_hot_m))
+                outputs_meta /= torch.sum(outputs_meta, dim=1, keepdim=True)
 
                 prob_classifier, pred_classifier = \
                     torch.max(outputs_classifier.data, 1)
                 _, pred_meta = torch.max(outputs_meta.data, 1)
-                prob_posthoc = torch.zeros((hum_preds.size(0))).to(self.device)
-
-                for j in range(n_classes):
-                    one_hot_j = torch.zeros((hum_preds.size(0), n_classes))
-                    one_hot_j[:, j] = 1
-                    one_hot_j = one_hot_j.to(self.device)
-
-                    outputs_meta_j = F.sigmoid(self.model_meta(data_x,
-                                                               one_hot_j))
-                    prob_meta_j, _ = torch.max(outputs_meta_j.data, 1)
-                    prob_posthoc += outputs_sim[:, j] * prob_meta_j
+                prob_posthoc = F.sigmoid(self.model_classifier(data_x)
+                                         [:, n_classes])
 
 #               rejector = prob_posthoc - cost - prob_ai
 

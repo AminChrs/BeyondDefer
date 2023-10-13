@@ -39,6 +39,7 @@ def calculate_lower_bounds(model_meta,
     total = 0
     y_m_list = np.zeros((1, 2))
     h_y_x_list = np.array([])
+    r_optimal = np.array([])
     with torch.no_grad():
         for _, (data_x, data_y, hum_preds) in enumerate(dataloader):
             data_x = data_x.to(device)
@@ -57,7 +58,10 @@ def calculate_lower_bounds(model_meta,
             _, pred_meta = torch.max(outputs_meta.data, 1)
 
             err_meta += torch.sum(pred_meta != data_y).item()
-
+            # calculate optimal r
+            r_optimal_temp = (data_y == hum_preds) * 1
+            r_optimal = np.concatenate([r_optimal,
+                                        r_optimal_temp.detach().cpu().numpy()])
             # calculate y_m_joint_dist, H(Y|X=x) list, and H(Y|X=x, M=m)
             y_reshaped = data_y.detach().cpu().numpy().reshape(
                                                         (data_y.size()[0], 1))
@@ -83,8 +87,11 @@ def calculate_lower_bounds(model_meta,
 
     # Calculating Deferral lower bound
     y_m_list = y_m_list[1:]
+    # deferral_lower_bound = \
+    #    calculate_defer_lower_bound(y_m_list, h_y_x_list, total, n_classes)
     deferral_lower_bound = \
-        calculate_defer_lower_bound(y_m_list, h_y_x_list, total, n_classes)
+        calculate_defer_lower_bound_given_r(y_m_list, h_y_x_list,
+                                            total, n_classes, r_optimal)
 
     # Calculating meta error term in the lower bound of meta
     p_err_meta = err_meta / total
@@ -124,6 +131,19 @@ def calculate_defer_lower_bound(y_m_list, h_y_x_list, total, n_classes):
         if defer_bound_temp < defer_bound:
             defer_bound = defer_bound_temp
     # print(defer_bound)
+    return defer_bound
+
+
+def calculate_defer_lower_bound_given_r(y_m_list, h_y_x_list, total, n_classes, r):
+    p_defer = np.sum(r)/r.shape[0]
+    h_y_x_selected = h_y_x_list[r == 0]
+    h_y_x = h_y_x_selected.sum() / h_y_x_selected.shape[0]
+    y_m_selected = y_m_list[r == 1]
+    y_m_joint_dist = np.zeros((n_classes, n_classes))
+    for y_m in y_m_selected:
+        y_m_joint_dist[int(y_m[0]), int(y_m[1])] += 1
+    h_y_m = calculate_h_y_m(y_m_joint_dist)
+    defer_bound = h_y_m * p_defer + h_y_x * (1 - p_defer)
     return defer_bound
 
 

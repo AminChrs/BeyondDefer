@@ -1,7 +1,6 @@
 import numpy as np
 import sklearn.metrics
 import copy
-import logging
 
 
 def compute_deferral_metrics(data_test):
@@ -41,6 +40,7 @@ def compute_deferral_metrics(data_test):
         data_test["labels"],
     )
     return results
+
 
 def compute_metalearner_metrics(data_test):
     """_summary_

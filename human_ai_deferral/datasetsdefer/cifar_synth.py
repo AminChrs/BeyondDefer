@@ -1,7 +1,6 @@
 import math
 import torch
 from .basedataset import BaseDataset
-from human_ai_deferral.datasetsdefer.generic_dataset import GenericImageExpertDataset
 import numpy as np
 import os
 import random
@@ -21,6 +20,7 @@ from scipy.special import expit
 import torch.distributions as D
 import logging
 import sys
+
 sys.path.append("../")
 import torchvision.datasets as datasets
 from torch.autograd import Variable
@@ -29,7 +29,7 @@ from torch.utils.data.dataset import random_split
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-
+from datasetsdefer.generic_dataset import GenericImageExpertDataset
 
 
 class CifarSynthExpert:

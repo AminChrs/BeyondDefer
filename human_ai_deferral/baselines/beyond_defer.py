@@ -20,10 +20,12 @@ class BeyondDefer(BaseSurrogateMethod):
                  model_sim, model_meta, device, 
                  learnable_threshold_rej=False):
         '''
+        alpha: hyperparameter for surrogate loss 
         plotting_interval (int): used for plotting model training in fit_epoch
-        model_classifier (pytorch model): model used for surrogate
+        model (pytorch model): model used for surrogate
         device: cuda device or cpu
         learnable_threshold_rej (bool): whether to learn a treshold on the
+        reject score (applicable to RealizableSurrogate only)
         '''
         self.plotting_interval = plotting_interval
         self.model_classifier = model_classifier
@@ -33,13 +35,13 @@ class BeyondDefer(BaseSurrogateMethod):
         self.threshold_rej = 0
         self.learnable_threshold_rej = learnable_threshold_rej
 
-    def LossOVA(self, outputs, y):
+    def LogisticLossOVA(self, outputs, y):
         outputs[torch.where(outputs == 0.0)] = (-1 * y) * (-1 * np.inf)
         loss_out = torch.log2(1 + torch.exp((-1 * y) * outputs + eps_cst)
                                 + eps_cst)
         return loss_out
     
-    def surrogate_loss(self, out_class, outputs_sim,
+    def surrogate_loss_function(self, outputs_classifier, outputs_sim,
                                 outputs_meta, m, data_y):
         """
         outputs: network outputs
@@ -49,21 +51,21 @@ class BeyondDefer(BaseSurrogateMethod):
         human_correct = (m == data_y).float()
         human_correct = torch.tensor(human_correct).to(self.device)
         
-        batch_size = out_class.size()[0]
-        l1 = self.LossOVA(out_class[range(batch_size), data_y], 1)
+        batch_size = outputs_classifier.size()[0]
+        l1 = self.LogisticLossOVA(outputs_classifier[range(batch_size), data_y], 1)
         l2 = torch.sum(
-            self.LossOVA(out_class[:, :-1], -1), dim=1
-        ) - self.LossOVA(out_class[range(batch_size), data_y], -1)
+            self.LogisticLossOVA(outputs_classifier[:, :-1], -1), dim=1
+        ) - self.LogisticLossOVA(outputs_classifier[range(batch_size), data_y], -1)
         
-        l3 = self.LossOVA(outputs_meta[range(batch_size), data_y], 1)
+        l3 = self.LogisticLossOVA(outputs_meta[range(batch_size), data_y], 1)
         l4 = torch.sum(
-            self.LossOVA(outputs_meta[:, :-1], -1), dim=1
-        ) - self.LossOVA(outputs_meta[range(batch_size), data_y], -1)
+            self.LogisticLossOVA(outputs_meta[:, :-1], -1), dim=1
+        ) - self.LogisticLossOVA(outputs_meta[range(batch_size), data_y], -1)
         
-        l5 = self.LossOVA(outputs_sim[range(batch_size), m], 1)
+        l5 = self.LogisticLossOVA(outputs_sim[range(batch_size), m], 1)
         l6 = torch.sum(
-            self.LossOVA(outputs_sim[:, :-1], -1), dim=1
-        ) - self.LossOVA(outputs_sim[range(batch_size), m], -1)
+            self.LogisticLossOVA(outputs_sim[:, :-1], -1), dim=1
+        ) - self.LogisticLossOVA(outputs_sim[range(batch_size), m], -1)
         
         l = l1 + l2 + l3 + l4 + l5 + l6
 
@@ -106,8 +108,9 @@ class BeyondDefer(BaseSurrogateMethod):
             outputs_meta = self.model_meta(data_x, one_hot_m)
             outputs_sim = self.model_sim(data_x)
             
-            loss = self.surrogate_loss(outputs_classifier,outputs_sim,
-                                       outputs_meta, hum_preds, data_y)
+            loss = self.surrogate_loss_function(outputs_classifier,
+                                                outputs_sim, outputs_meta,
+                                                hum_preds, data_y)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -277,3 +280,6 @@ class BeyondDefer(BaseSurrogateMethod):
             "class_probs": class_probs_all,
         }
         return data
+
+# TODO: Create another network class for meta learner
+# TODO: Check the loss function used to make sure everything is ok

@@ -17,8 +17,8 @@ import logging
 from tqdm import tqdm
 
 sys.path.append("..")
-from human_ai_deferral.helpers.utils import *
-from human_ai_deferral.helpers.metrics import *
+from helpers.utils import *
+from helpers.metrics import *
 from .basemethod import BaseMethod, BaseSurrogateMethod
 
 eps_cst = 1e-8

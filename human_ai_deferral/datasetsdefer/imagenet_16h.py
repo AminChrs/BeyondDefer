@@ -9,11 +9,10 @@ import sys
 import torch.nn as nn
 sys.path.append("../")
 sys.path.append("../networks")
-from human_ai_deferral.networks.cnn import DenseNet121_CE
+from networks.cnn import DenseNet121_CE
 import torchvision.transforms as transforms
-from human_ai_deferral.datasetsdefer.generic_dataset import GenericImageExpertDataset
+from datasetsdefer.generic_dataset import GenericImageExpertDataset
 from .basedataset import BaseDataset
-import logging
 
 
 # https://osf.io/2ntrf/
@@ -65,6 +64,7 @@ class ImageNet16h(BaseDataset):
 
         """
         # check if the folder data_dir has everything we need
+
         if not os.path.exists(
             self.data_dir
             + "/Behavioral Data/human_only_classification_6per_img_export.csv"
@@ -124,20 +124,18 @@ class ImageNet16h(BaseDataset):
         image_names = os.listdir(
             self.data_dir + "/Noisy Images/phase_noise_" + self.noise_version
         )
-        image_names = [x for x in image_names if x.endswith(".png") and not x.startswith("._")]
-
+        image_names = [x for x in image_names if x.endswith(".png")]
         # remove png extension
         image_names = [x[:-4] for x in image_names]
         image_paths = np.array(
             [
-                "/home/mcharusaie/Git_Beyond/data/osfstorage-archive/Noisy Images/phase_noise_110/"
+                "/data/ml2/shared/mozannar/improved_deferral/data/osfstorage-archive/Noisy Images/phase_noise_080/"
                 + x
                 + ".png"
                 for x in image_names
             ]
         )
         # get label for image names
-
         image_names_labels = np.array(
             [self.category_to_idx[imagenames_categories[x]] for x in image_names]
         )

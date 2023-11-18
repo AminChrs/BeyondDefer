@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import logging
 # import copy
+import sys
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,8 +29,14 @@ class MetaNet(nn.Module):
         self.pretrained = pretrained_model
 
         for layer in remove_layers:
-            # layer is a string
-            setattr(self.pretrained, layer, Identity())
+            if "." not in layer:
+                setattr(self.pretrained, layer, Identity())
+            else:
+                layer = layer.split(".")
+                inner_layer = self.pretrained
+                for i in range(len(layer) - 1):
+                    inner_layer = getattr(inner_layer, layer[i])
+                setattr(inner_layer, layer[-1], Identity())
 
         self.n_linear_layers = n_linear_layers
         self.conv_layers = []

@@ -11,7 +11,7 @@ sys.path.append("../")
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from datasetsdefer.generic_dataset import GenericImageExpertDataset
+from human_ai_deferral.datasetsdefer.generic_dataset import GenericImageExpertDataset
 import requests
 from .basedataset import BaseDataset
 

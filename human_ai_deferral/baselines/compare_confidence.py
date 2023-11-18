@@ -20,8 +20,8 @@ from tqdm import tqdm
 from .basemethod import BaseMethod
 
 sys.path.append("..")
-from helpers.metrics import *
-from helpers.utils import *
+from human_ai_deferral.helpers.metrics import *
+from human_ai_deferral.helpers.utils import *
 
 eps_cst = 1e-8
 
@@ -118,7 +118,10 @@ class CompareConfidence(BaseMethod):
             data_y = data_y.to(self.device)
             hum_preds = hum_preds.to(self.device)
             hum_equal_to_y = (hum_preds == data_y).long()
-            hum_equal_to_y = torch.cuda.LongTensor(hum_equal_to_y).to(self.device)
+            if (self.device == torch.device("cuda")):
+                hum_equal_to_y = torch.cuda.LongTensor(hum_equal_to_y).to(self.device)
+            else:
+                hum_equal_to_y = torch.LongTensor(hum_equal_to_y).to(self.device)
             outputs = self.model_expert(data_x)
             # cross entropy loss
             loss = loss_fn(outputs, hum_equal_to_y)

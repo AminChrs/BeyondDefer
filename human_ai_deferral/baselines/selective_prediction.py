@@ -17,8 +17,8 @@ import logging
 from tqdm import tqdm
 
 sys.path.append("..")
-from helpers.utils import *
-from helpers.metrics import *
+from human_ai_deferral.helpers.utils import *
+from human_ai_deferral.helpers.metrics import *
 from .basemethod import BaseMethod
 
 eps_cst = 1e-8
@@ -115,7 +115,7 @@ class SelectivePrediction(BaseMethod):
         # fit classifier and expert same time
         optimizer_class = optimizer(self.model_class.parameters(), lr=lr)
         if scheduler is not None:
-            scheduler = scheduler(optimizer, len(dataloader_train)*epochs)
+            scheduler = scheduler(optimizer_class, len(dataloader_train)*epochs)
 
         self.model_class.train()
         for epoch in tqdm(range(epochs)):

@@ -16,8 +16,8 @@ import pickle
 import logging
 from tqdm import tqdm
 sys.path.append("..")
-from helpers.utils import *
-from helpers.metrics import *
+from human_ai_deferral.helpers.utils import *
+from human_ai_deferral.helpers.metrics import *
 
 
 class BaseMethod(ABC):

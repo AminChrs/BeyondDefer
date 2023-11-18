@@ -4,9 +4,9 @@ import sys
 import logging
 from tqdm import tqdm
 sys.path.append("..")
-from helpers.utils import *
-from helpers.metrics import *
-from baselines.basemethod import BaseSurrogateMethod
+from human_ai_deferral.helpers.utils import *
+from human_ai_deferral.helpers.metrics import *
+from human_ai_deferral.baselines.basemethod import BaseSurrogateMethod
 
 
 eps_cst = 1e-8

@@ -2,3 +2,4 @@ data/*
 .DS_Store
 *.pdf
 *.svg
+human_ai_deferral/*

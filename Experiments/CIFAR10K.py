@@ -6,12 +6,14 @@ import matplotlib.pyplot as plt
 import os
 import torch
 import logging
+from tikzplotlib import save as tikz_save
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def plot_res_vs_k(results, methods, filename, k_range):
     logging.info("len(results[0]): {}".format(len(results[0])))
+    fig = plt.figure()
     for i in range(len(results[0])):
         acc = []
         acc2 = []
@@ -41,6 +43,9 @@ def plot_res_vs_k(results, methods, filename, k_range):
                 os.mkdir(str_filename + filename_sp[i])
             str_filename += filename_sp[i] + "/"
     plt.savefig(filename)
+    filename = filename.replace(".pdf", ".tex")
+    tikz_save(filename, figure=fig,
+              axis_width='\\textwidth', axis_height='\\textwidth')
 
 
 def CIFAR10K_init():

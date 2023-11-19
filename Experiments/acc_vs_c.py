@@ -21,9 +21,9 @@ def acc_c_init():
                "One-versus-All", "Cross Entropy"]  
     datasets = ["cifar", "cifar10h", "hatespeech", "imagenet"]
     res_dir = "./Results/loss_vs_c/"
-    # epochs = [150, 150, 150, 150]
+    epochs = [150, 150, 150, 150]
     # epochs = [1, 1, 1, 1]
-    epochs = [30, 30, 30, 30]
+    # epochs = [30, 30, 30, 30]
     return return_res(methods=methods, res_dir=res_dir, epochs=epochs,
                       datasets=datasets)
 

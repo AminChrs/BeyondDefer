@@ -10,7 +10,7 @@ from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add
 from Experiments.basic import plot_cov_vs_acc
 # from human_ai_defer.helpers.metrics import
 # compute_additional_defer_metrics
-# from metrics import compute_metalearner_metrics
+# from metrics.metrics import compute_metalearner_metrics
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
 from MyMethod.additional_defer import AdditionalBeyond

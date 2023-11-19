@@ -12,16 +12,25 @@ def aggregate_plots(xs, accs, x_out, method="max"):
         acc_o = []
         for j in range(len(x_out)):
             if x_out[j] < min(xs[i]) or x_out[j] > max(xs[i]):
-                acc_o.append(-np.inf)
+                if method == "max" or method == "avg":
+                    acc_o.append(-np.inf)
+                elif method == "min":
+                    acc_o.append(np.inf)
             else:
                 acc_o.append(np.interp(x_out[j], xs[i], acc))
         accs_out.append(acc_o)
     accs_out = np.array(accs_out)
     if method == "max":
         accs_out = np.max(accs_out, axis=0)
+        return accs_out
+    elif method == "min":
+        accs_out = np.min(accs_out, axis=0)
+        return accs_out
     elif method == "avg":
+        accs_out_std = np.std(accs_out, axis=0)
         accs_out = np.mean(accs_out, axis=0)
-    return accs_out
+        return accs_out, accs_out_std
+
 
 
 def compute_metalearner_metrics(data_test):
@@ -68,6 +77,25 @@ def compute_metalearner_metrics(data_test):
     return results
 
 
+def cov_vs_acc_AFE(data_test, method="cov"):
+    rej_scores = np.unique(data_test["rej_score"])
+    if method == "c":
+        rej_scores_quantiles = np.arange(0, 1, 0.01)
+    else:
+        rej_scores_quantiles = np.quantile(rej_scores, np.linspace(0, 1, 100))
+    all_metrics = []
+    all_metrics.append({"coverage": 0, "system_acc": 0})
+    for q in rej_scores_quantiles:
+        metrics = {}
+        defers = (data_test["rej_score"] > q).astype(int)
+        metrics["coverage"] = 1 - np.mean(defers)
+        loss = data_test["loss_meta"]*defers +\
+            data_test["loss_class"]*(1-defers)
+        accuracy = 1 - loss
+        metrics["system_acc"] = np.mean(accuracy)
+        all_metrics.append(metrics)
+    return all_metrics
+
 def cov_vs_acc_meta(data_test, method="cov"):
     rej_scores = np.unique(data_test["rej_score"])
     if method == "c":
@@ -85,7 +113,7 @@ def cov_vs_acc_meta(data_test, method="cov"):
     return all_metrics
 
 
-def cov_vs_acc_add(data_test, method="cov"):
+def cov_vs_acc_add(data_test, method="cov", loss_matrix=None):
     rej_scores1 = np.unique(data_test["rej_score1"])
     rej_scores2 = np.unique(data_test["rej_score2"])
     if method == "c":
@@ -97,10 +125,13 @@ def cov_vs_acc_add(data_test, method="cov"):
         rej_scores2_quantiles = \
             np.quantile(rej_scores2, np.linspace(0, 1, 100))
     all_metrics = []
-    all_metrics.append(compute_additional_defer_metrics(data_test))
+    all_metrics.append(compute_additional_defer_metrics(data_test,
+                       loss_matrix=loss_matrix))
     accs = []
     covs = []
+    losses = []
     for q in rej_scores1_quantiles:
+        # logging.info("q: {}".format(q))
         tot_metrics = []
         for q2 in rej_scores2_quantiles:
             if method == "c":
@@ -111,20 +142,34 @@ def cov_vs_acc_add(data_test, method="cov"):
             defers = np.argmax(stack, axis=0)
             copy_data = copy.deepcopy(data_test)
             copy_data["defers"] = defers
-            metrics = compute_additional_defer_metrics(copy_data)
+            metrics = compute_additional_defer_metrics(copy_data,
+                                                       loss_matrix=loss_matrix)
             tot_metrics.append(metrics)
             if method == "c":
                 break
-        accs.append([m["system_acc"] for m in tot_metrics])
-        covs.append([m["coverage"] for m in tot_metrics])
+        if method == "c":
+            accs.append(tot_metrics[0]["system_acc"])
+            covs.append(tot_metrics[0]["coverage"])
+        elif method == "cov":
+            accs.append([m["system_acc"] for m in tot_metrics])
+            covs.append([m["coverage"] for m in tot_metrics])
+            if loss_matrix is not None:
+                losses.append([m["system_loss"] for m in tot_metrics])
     if method == "c":
         accs_out = accs
         x_out = covs
     else:
         x_out = np.arange(0, 1, 0.01)
         accs_out = aggregate_plots(covs, accs, x_out, method="max")
+        if loss_matrix is not None:
+            losses_out = aggregate_plots(covs, losses, x_out, method="min")
     for i in range(len(accs_out)):
-        all_metrics.append({"system_acc": accs_out[i], "coverage": x_out[i]})
+        if loss_matrix is not None:
+            all_metrics.append({"system_acc": accs_out[i], "coverage":
+                                x_out[i], "system_loss": losses_out[i]})
+        else:
+            all_metrics.append({"system_acc": accs_out[i], "coverage":
+                                x_out[i]})
     return all_metrics
 
 

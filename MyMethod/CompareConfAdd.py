@@ -6,7 +6,7 @@ import time
 import logging
 from tqdm import tqdm
 from human_ai_defer.helpers.utils import AverageMeter, accuracy
-from human_ai_defer.helpers.metrics import compute_additional_defer_metrics
+from metrics.metrics import compute_additional_defer_metrics
 from human_ai_defer.baselines.basemethod import BaseMethod
 #  This file is unfinished and not used in the paper
 eps_cst = 1e-8

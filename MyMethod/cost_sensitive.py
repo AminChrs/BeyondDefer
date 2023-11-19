@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn.functional as F
 import logging
 from tqdm import tqdm
-from Metrics.metrics import compute_deferral_metrics_cost_sensitive
+from metrics.metrics import compute_deferral_metrics_cost_sensitive
 from human_ai_defer.baselines.compare_confidence import CompareConfidence
 from human_ai_defer.baselines.one_v_all import OVASurrogate
 from human_ai_defer.baselines.lce_surrogate import LceSurrogate

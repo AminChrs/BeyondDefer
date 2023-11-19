@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import logging
 from tqdm import tqdm
-from human_ai_defer.helpers.metrics import compute_deferral_metrics
+from metrics.metrics import compute_deferral_metrics
 from human_ai_defer.baselines.basemethod import BaseSurrogateMethod
 
 

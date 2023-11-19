@@ -5,10 +5,10 @@ from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
 from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
 from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
 from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
-from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
+from metrics.metrics import compute_coverage_v_acc_curve
 from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add
 from Experiments.basic import plot_cov_vs_acc
-# from human_ai_defer.helpers.metrics import
+# from metrics.metrics import
 # compute_additional_defer_metrics
 # from metrics.metrics import compute_metalearner_metrics
 from MyNet.networks import MetaNet

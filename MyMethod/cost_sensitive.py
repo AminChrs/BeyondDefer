@@ -5,10 +5,10 @@ import torch.nn.functional as F
 import logging
 from tqdm import tqdm
 from Metrics.metrics import compute_deferral_metrics_cost_sensitive
-from human_ai_deferral.baselines.compare_confidence import CompareConfidence
-from human_ai_deferral.baselines.one_v_all import OVASurrogate
-from human_ai_deferral.baselines.lce_surrogate import LceSurrogate
-from human_ai_deferral.methods.realizable_surrogate import RealizableSurrogate
+from human_ai_defer.baselines.compare_confidence import CompareConfidence
+from human_ai_defer.baselines.one_v_all import OVASurrogate
+from human_ai_defer.baselines.lce_surrogate import LceSurrogate
+from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
 
 
 class CompareConfidenceCostSensitive(CompareConfidence):

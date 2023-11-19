@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from MyNet.call_net import networks, optimizer_scheduler
 from MyMethod.beyond_defer import BeyondDefer
-from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
+from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
 from Experiments.basic_parallel import return_res, experiment_parallel
 import logging
 import warnings

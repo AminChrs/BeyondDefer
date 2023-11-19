@@ -5,9 +5,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-from human_ai_deferral.baselines.basemethod import BaseMethod
-from human_ai_deferral.helpers.metrics import compute_deferral_metrics
-from human_ai_deferral.helpers.utils import AverageMeter, accuracy
+from human_ai_defer.baselines.basemethod import BaseMethod
+from human_ai_defer.helpers.metrics import compute_deferral_metrics
+from human_ai_defer.helpers.utils import AverageMeter, accuracy
 
 eps_cst = 1e-8
 

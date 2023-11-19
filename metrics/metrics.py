@@ -3,7 +3,7 @@ import numpy as np
 import sklearn.metrics
 import copy
 import matplotlib.pyplot as plt
-from human_ai_deferral.helpers.metrics import compute_additional_defer_metrics
+from human_ai_defer.helpers.metrics import compute_additional_defer_metrics
 
 
 def aggregate_plots(xs, accs, x_out, method="max"):

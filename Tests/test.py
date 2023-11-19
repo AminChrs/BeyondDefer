@@ -1,20 +1,20 @@
 from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
 from MyNet.call_net import networks, optimizer_scheduler
-from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
-from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
-from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
-from human_ai_deferral.datasetsdefer.imagenet_16h import ImageNet16h
-from human_ai_deferral.methods.realizable_surrogate import RealizableSurrogate
-from human_ai_deferral.helpers.metrics import compute_coverage_v_acc_curve
+from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
+from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
+from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
+from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
+from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
+from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
 from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add
 from Experiments.basic import plot_cov_vs_acc
-# from human_ai_deferral.helpers.metrics import
+# from human_ai_defer.helpers.metrics import
 # compute_additional_defer_metrics
-# from human_ai_deferral.helpers.metrics import compute_metalearner_metrics
+# from metrics import compute_metalearner_metrics
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
 from MyMethod.additional_defer import AdditionalBeyond
-from human_ai_deferral.networks.cnn import NetSimple
+from human_ai_defer.networks.cnn import NetSimple
 # from metrics.metrics import plot_cov_vs_acc
 from Experiments.basic_parallel import experiment_parallel, return_res
 import torch
@@ -49,7 +49,7 @@ def test_indexed():
         assert index == i
 
     if Test_Text:
-        data_dir = './human_ai_deferral/data/'
+        data_dir = './human_ai_defer/data/'
         Dataset_Hate = HateSpeech(data_dir, True, False, 'random_annotator',
                                   device)
         Dataset_Hate_indexed = IndexedDataset(Dataset_Hate)
@@ -78,7 +78,7 @@ def test_active_mask():
 
     # Text
     if Test_Text:
-        data_dir = './human_ai_deferral/data/'
+        data_dir = './human_ai_defer/data/'
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         Dataset_Hate = HateSpeech(data_dir, True, False, 'random_annotator',
                                   device)

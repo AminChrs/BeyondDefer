@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import torch.nn.functional as F
-from human_ai_deferral.baselines.basemethod import BaseSurrogateMethod
+from human_ai_defer.baselines.basemethod import BaseSurrogateMethod
 
 eps_cst = 1e-8
 

@@ -1,7 +1,7 @@
-from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
-from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
-from human_ai_deferral.datasetsdefer.imagenet_16h import ImageNet16h
-from human_ai_deferral.datasetsdefer.cifar_h import Cifar10h
+from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
+from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
+from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
+from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
 from Experiments.basic import cov_vs_acc_add, compute_coverage_v_acc_curve
 from Experiments.basic import plot_cov_vs_cost
 from Experiments.basic_parallel import experiment_parallel, return_res

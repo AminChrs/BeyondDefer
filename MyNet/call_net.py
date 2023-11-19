@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
-from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
-from human_ai_deferral.datasetsdefer.hatespeech import HateSpeech
+from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
+from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
 from MyNet.networks import MetaNet
-from human_ai_deferral.networks.cnn import WideResNet
-from human_ai_deferral.baselines.selective_prediction import\
+from human_ai_defer.networks.cnn import WideResNet
+from human_ai_defer.baselines.selective_prediction import\
      SelectivePrediction
-from human_ai_deferral.networks.cnn import NetSimple
-from human_ai_deferral.networks.cnn import DenseNet121_CE
-from human_ai_deferral.networks.linear_net import LinearNet
+from human_ai_defer.networks.cnn import NetSimple
+from human_ai_defer.networks.cnn import DenseNet121_CE
+from human_ai_defer.networks.linear_net import LinearNet
 import os
 import numpy as np
 import logging

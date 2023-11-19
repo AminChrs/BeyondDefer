@@ -1,5 +1,5 @@
 from Experiments.basic import general_experiment
-from human_ai_deferral.datasetsdefer.cifar_synth import CifarSynthDataset
+from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
 from Experiments.basic_parallel import experiment_parallel, return_res
 import numpy as np
 import matplotlib.pyplot as plt

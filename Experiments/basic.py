@@ -4,11 +4,11 @@ from MyMethod.additional_defer import AdditionalBeyond
 # from MyMethod.learned_beyond import LearnedBeyond
 from MyMethod.learned_additional import LearnedAdditional
 from MyMethod.CompareConfMeta import CompareConfMeta
-from human_ai_deferral.methods.realizable_surrogate import RealizableSurrogate
-from human_ai_deferral.baselines.compare_confidence import CompareConfidence
-from human_ai_deferral.baselines.lce_surrogate import LceSurrogate
-from human_ai_deferral.baselines.one_v_all import OVASurrogate
-from human_ai_deferral.helpers.metrics import compute_coverage_v_acc_curve
+from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
+from human_ai_defer.baselines.compare_confidence import CompareConfidence
+from human_ai_defer.baselines.lce_surrogate import LceSurrogate
+from human_ai_defer.baselines.one_v_all import OVASurrogate
+from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
 import os
 # from metrics.metrics import cov_vs_acc_meta
 from metrics.metrics import cov_vs_acc_add

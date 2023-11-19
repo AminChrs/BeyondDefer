@@ -3,11 +3,11 @@
 # Afterwards, I update my belief about the human label and re-train the model
 import copy
 import torch
-from human_ai_deferral.datasetsdefer.basedataset import BaseDataset
-from human_ai_deferral.baselines.basemethod import BaseMethod
-from human_ai_deferral.helpers.utils import AverageMeter, accuracy
-from human_ai_deferral.helpers.metrics import compute_metalearner_metrics
-from human_ai_deferral.helpers.metrics import compute_classification_metrics
+from human_ai_defer.datasetsdefer.basedataset import BaseDataset
+from human_ai_defer.baselines.basemethod import BaseMethod
+from human_ai_defer.helpers.utils import AverageMeter, accuracy
+from metrics import compute_metalearner_metrics
+from human_ai_defer.helpers.metrics import compute_classification_metrics
 import logging
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler

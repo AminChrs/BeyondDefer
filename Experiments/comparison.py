@@ -89,7 +89,8 @@ def entropy_set_function(r, h_y_x_list, y_m_list, n_classes, verbose=False):
     return defer_bound_temp
 
 
-def ent_set_function(set_in, set_max, h_y_x_list, y_m_list, n_classes, verbose=False):
+def ent_set_function(set_in, set_max, h_y_x_list, y_m_list, n_classes,
+                     verbose=False):
     r = np.zeros(len(set_max))
     for i in range(len(set_in)):
         r[set_in[i]] = 1.0
@@ -224,7 +225,7 @@ def calculate_defer_lower_bound(y_m_list, h_y_x_list, n_classes):
     def entf(set_in): return ent_set_function(set_in, set_max, h_y_x_list,
                                               y_m_list,
                                               n_classes)
-    MySetFunc = SetFunction(entf, set_max)
+    SetFunction(entf, set_max)
     # defer_bound_2 = MySetFunc.min([], iter=len(set_max))
     defer_bound_2 = 0
     # print(defer_bound)
@@ -241,7 +242,7 @@ def plot_lb(results, filename):
     k_range = np.arange(1, len(results) + 1)
     plt.figure()
     defer_bounds = [res_pack[0] for res_pack in results]
-    defer_bounds2 = [res_pack[1] for res_pack in results]
+    # defer_bounds2 = [res_pack[1] for res_pack in results]
     meta_bounds = [res_pack[2] for res_pack in results]
     meta_errs = [res_pack[3] for res_pack in results]
     meta_bounds2 = [res_pack[4] for res_pack in results]

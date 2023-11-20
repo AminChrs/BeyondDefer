@@ -2,7 +2,7 @@ from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
 from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
 from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
 from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
-from Experiments.basic import general_experiment  # , active_experiment
+from Experiments.basic import general_experiment, active_experiment
 from Experiments.basic_parallel import experiment_parallel, return_res
 import matplotlib.pyplot as plt
 import torch
@@ -100,6 +100,15 @@ def for_loop(res, iter):
                                         res.epochs[j], res.num_classes[j],
                                         device, subsample=True,
                                         iter=iter % 10)
+        train_dataset = res.datasets[j].data_train_loader.dataset
+        len_train = len(train_dataset)
+        prop = 0.05
+        intervals = int(len_train * prop)
+        res_active = active_experiment(res.datasets[j], res.names[j],
+                                       res.epochs[1], res.num_classes[j],
+                                       iter % 10 + 1,
+                                       device=device, len_queries=intervals,)
+        packed_res = packed_res + (res_active,)
         if not packed_res:
             logging.info("End of the possible samples")
             res.break_flag = True

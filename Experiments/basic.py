@@ -11,7 +11,8 @@ from human_ai_defer.baselines.one_v_all import OVASurrogate
 from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
 import os
 # from metrics.metrics import cov_vs_acc_meta
-from metrics.metrics import cov_vs_acc_add
+from tikzplotlib import save as tikz_save
+from metrics.metrics import cov_vs_acc_add, cov_vs_acc_AFE
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -176,10 +177,11 @@ def general_experiment(dataset, dataset_name, epochs, num_classes, device,
 
 
 def active_experiment(dataset, dataset_name, epochs, num_classes, num_queries,
-                      len_queries, device="cpu"):
+                      len_queries=None, device="cpu"):
 
     Dataset = ActiveDataset(dataset)
-
+    if len_queries is None:
+        len_queries = len(Dataset.data_train_loader.dataset)
     classifier, meta = networks(dataset_name, "AFE", device)
     ActiveElicit = AFE(classifier, meta, device)
     optimizer, scheduler = optimizer_scheduler()
@@ -188,13 +190,17 @@ def active_experiment(dataset, dataset_name, epochs, num_classes, num_queries,
                      query_size=len_queries,
                      num_queries=num_queries, scheduler_classifier=scheduler,
                      scheduler_meta=scheduler, optimizer=optimizer)
-
-    return ActiveElicit.report
+    last_iter = len(ActiveElicit.report) - 1
+    logging.info("Last iteration: {}".format(last_iter))
+    logging.info("num queries: {}".format(num_queries))
+    rep = ActiveElicit.report[last_iter]
+    res_AFE = cov_vs_acc_AFE(rep)
+    return res_AFE
 
 
 def plot_cov_vs_acc(results, methods, filename,
                     method="cov", is_loss=False, std=True):
-    plt.figure()
+    fig = plt.figure()
     # Get the default color cycle
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
@@ -252,11 +258,15 @@ def plot_cov_vs_acc(results, methods, filename,
             str_filename += filename_sp[i] + "/"
 
     plt.savefig(filename)
+    # replace pdf with tex
+    filename = filename.replace(".pdf", ".tex")
+    tikz_save(filename, figure=fig,
+              axis_width='\\textwidth', axis_height='\\textwidth')
 
 
 def plot_cov_vs_cost(results, methods, filename,
                      method="cov", std=True):
-    plt.figure()
+    fig = plt.figure()
     # Get the default color cycle
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
@@ -301,3 +311,6 @@ def plot_cov_vs_cost(results, methods, filename,
             str_filename += filename_sp[i] + "/"
 
     plt.savefig(filename)
+    filename = filename.replace(".pdf", ".tex")
+    tikz_save(filename, figure=fig,
+              axis_width='\\textwidth', axis_height='\\textwidth')

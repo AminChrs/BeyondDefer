@@ -27,13 +27,15 @@ class experiment_parallel():
             elif iter == self.iter:
                 while True:
                     for i in range(self.iter):
-                        if not os.path.exists(self.filename + str(i) + ".pkl"):
+                        j = (i//4)*10+(i % 4)
+                        if not os.path.exists(self.filename + str(j) + ".pkl"):
                             break
                     else:
                         break
                 res = []
                 for i in range(self.iter):
-                    with open(self.filename + str(i) + ".pkl", 'rb') as f:
+                    j = (i//4)*10+(i % 4)
+                    with open(self.filename + str(j) + ".pkl", 'rb') as f:
                         loaded_data = pickle.load(f)
                         res_i = return_res(from_dump=True, data=loaded_data)
                         res.append(res_i)

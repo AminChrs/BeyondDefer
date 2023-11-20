@@ -429,7 +429,8 @@ def test_Query_test():
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
-    loss = Dataset_CIFAR_Active.Query_test(criterion, AFE_CIFAR.loss_defer, 10)
+    loss, _, _, _ = Dataset_CIFAR_Active.Query_test(criterion,
+                                                    AFE_CIFAR.loss_defer, 10)
     logging.info(loss)
     assert isinstance(loss, float)
     assert loss >= 0
@@ -1451,16 +1452,16 @@ def test_AFE_imagenet():
 
 
 def test_all():
-    test_indexed()
-    test_active_mask()
-    test_active_query()
-    test_Meta_model()
-    test_AFE_loss()
-    test_AFE_loss_loaders()
-    test_AFE_CE_loss()
-    test_AFE_fit_epochs()
-    test_AFE_fit_Eu()
-    test_Query_unnumbered()
+    # test_indexed()
+    # test_active_mask()
+    # test_active_query()
+    # test_Meta_model()
+    # test_AFE_loss()
+    # test_AFE_loss_loaders()
+    # test_AFE_CE_loss()
+    # test_AFE_fit_epochs()
+    # test_AFE_fit_Eu()
+    # test_Query_unnumbered()
     test_Query_test()
     test_iteration_report()
     test_AFE_fit()

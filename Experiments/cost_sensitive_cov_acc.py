@@ -10,8 +10,8 @@ from torch.utils.data import DataLoader
 from MyNet.call_net import networks, optimizer_scheduler
 from MyMethod.additional_cost import AdditionalCost
 from MyMethod.CompareConfMetaCost import CompareConfMetaCost
-from baselines.lce_cost import LceCost
-from baselines.compare_confidence_cost import CompareConfCost
+from BL.lce_cost import LceCost
+from BL.compare_confidence_cost import CompareConfCost
 from baselines.one_v_all_cost import OVACost
 import warnings
 import numpy as np

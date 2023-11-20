@@ -308,6 +308,8 @@ class AdditionalBeyond(BaseMethod):
 
                     outputs_meta_j = F.sigmoid(self.model_meta(data_x,
                                                                one_hot_j))
+                    outputs_meta_j /= torch.sum(outputs_meta_j, dim=1,
+                                                keepdim=True)
                     prob_meta_j, _ = torch.max(outputs_meta_j.data, 1)
                     prob_posthoc += outputs_sim[:, j] * prob_meta_j
 

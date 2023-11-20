@@ -80,6 +80,26 @@ def networks(dataset_name, method, device):
                                  [1, 20, 1],
                                  remove_layers=["fc3", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
+        if method == "LearnedBeyond":
+            model_classifier = NetSimple(11, 50, 50, 100, 20).to(device)
+            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_meta
+        if method == "LearnedAdditional":
+            model_classifier = NetSimple(12, 50, 50, 100, 20).to(device)
+            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_meta
+        if method == "CompConfMeta":
+            model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
+            model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            model_defer = NetSimple(2, 50, 50, 100, 20).to(device)
+            model_defer_meta = NetSimple(2, 50, 50, 100, 20).to(device)
+            return model_classifier, model_meta, model_defer, model_defer_meta
         elif method == "AFE":
             model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)
             model_meta = MetaNet(10, NetSimple(10, 50, 50, 100, 20),
@@ -117,13 +137,42 @@ def networks(dataset_name, method, device):
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
-        elif method == "AFE":
-            model_classifier = model_cifarh(10, device,
-                                            "./models/cifar10h_classifier.pt")
-            model_meta = MetaNet(10, model_cifarh(10, device, "../models/\
-                                                    cifar10h_classifier.pt"),
+        if method == "LearnedBeyond":
+            model_classifier = model_cifarh(11, device,
+                                            "./models/cifar10h.pt")
+            model_meta = MetaNet(10, model_cifarh(10, device,
+                                                  "./models/cifar10h.pt"),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
+            return model_classifier, model_meta
+        if method == "LearnedAdditional":
+            model_classifier = model_cifarh(12, device,
+                                            "./models/cifar10h.pt")
+            model_meta = MetaNet(10, model_cifarh(10, device,
+                                                  "./models/cifar10h.pt"),
+                                 [1, 50, 1],
+                                 remove_layers=["fc2", "softmax"]).to(device)
+            return model_classifier, model_meta
+        if method == "CompConfMeta":
+            model_classifier = model_cifarh(10, device,
+                                            "./models/cifar10h.pt")
+            model_meta = MetaNet(10, model_cifarh(10, device,
+                                                  "./models/cifar10h.pt"),
+                                 [1, 50, 1],
+                                 remove_layers=["fc2", "softmax"]).to(device)
+            model_defer = model_cifarh(2, device,
+                                       "./models/cifar10h.pt")
+            model_defer_meta = model_cifarh(2, device,
+                                            "./models/cifar10h.pt")
+            return model_classifier, model_meta, model_defer, model_defer_meta
+        elif method == "AFE":
+            model_classifier = model_cifarh(10, device,
+                                            "./models/cifar10h.pt")
+            model_meta = MetaNet(10, model_cifarh(10, device, 
+                                                  "./models/cifar10h.pt"),
+                                 [1, 50, 1],
+                                 remove_layers=["fc2", "softmax"]).to(device)
+            logging.info("AFE model assigned!")
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
             model_classifier = model_cifarh(10, device,
@@ -143,20 +192,46 @@ def networks(dataset_name, method, device):
             model_human = model_imagenet(16, device)
             model_meta = MetaNet(16, model_imagenet(16, device),
                                  [1, 1024, 1],
-                                 remove_layers=["densenet121.classifier"]).to(device)
+                                 remove_layers=["densenet121.classifier"]
+                                 ).to(device)
             return model_classifier, model_human, model_meta
         if method == "Additional":
             model_classifier = model_imagenet(17, device)
             model_human = model_imagenet(16, device)
             model_meta = MetaNet(16, model_imagenet(16, device),
                                  [1, 1024, 1],
-                                 remove_layers=["densenet121.classifier"]).to(device)
+                                 remove_layers=["densenet121.classifier"]
+                                 ).to(device)
             return model_classifier, model_human, model_meta
+        if method == "LearnedBeyond":
+            model_classifier = model_imagenet(17, device)
+            model_meta = MetaNet(16, model_imagenet(16, device),
+                                 [1, 1024, 1],
+                                 remove_layers=["densenet121.classifier"]
+                                 ).to(device)
+            return model_classifier, model_meta
+        if method == "LearnedAdditional":
+            model_classifier = model_imagenet(18, device)
+            model_meta = MetaNet(16, model_imagenet(16, device),
+                                 [1, 1024, 1],
+                                 remove_layers=["densenet121.classifier"]
+                                 ).to(device)
+            return model_classifier, model_meta
+        if method == "CompConfMeta":
+            model_classifier = model_imagenet(16, device)
+            model_meta = MetaNet(16, model_imagenet(16, device),
+                                 [1, 1024, 1],
+                                 remove_layers=["densenet121.classifier"]
+                                 ).to(device)
+            model_defer = model_imagenet(2, device)
+            model_defer_meta = model_imagenet(2, device)
+            return model_classifier, model_meta, model_defer, model_defer_meta
         elif method == "AFE":
             model_classifier = model_imagenet(16, device)
             model_meta = MetaNet(16, model_imagenet(16, device),
                                  [1, 1024, 1],
-                                 remove_layers=["densenet121.classifier"]).to(device)
+                                 remove_layers=["densenet121.classifier"]
+                                 ).to(device)
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
             model_classifier = model_imagenet(16, device)
@@ -191,6 +266,23 @@ def networks(dataset_name, method, device):
             model_meta = MetaNet(3, LinearNet(d, 10),
                                  [1, 10, 1]).to(device)
             return model_classifier, model_human, model_meta
+        if method == "LearnedBeyond":
+            model_classifier = LinearNet(d, 4).to(device)
+            model_meta = MetaNet(3, LinearNet(d, 10),
+                                 [1, 10, 1]).to(device)
+            return model_classifier, model_meta
+        if method == "LearnedAdditional":
+            model_classifier = LinearNet(d, 5).to(device)
+            model_meta = MetaNet(3, LinearNet(d, 10),
+                                 [1, 10, 1]).to(device)
+            return model_classifier, model_meta
+        if method == "CompConfMeta":
+            model_classifier = LinearNet(d, 3).to(device)
+            model_meta = MetaNet(3, LinearNet(d, 10),
+                                 [1, 10, 1]).to(device)
+            model_defer = LinearNet(d, 2).to(device)
+            model_defer_meta = LinearNet(d, 2).to(device)
+            return model_classifier, model_meta, model_defer, model_defer_meta
         elif method == "AFE":
             model_classifier = LinearNet(d, 3).to(device)
             model_meta = MetaNet(3, LinearNet(d, 10),
@@ -206,3 +298,4 @@ def networks(dataset_name, method, device):
         else:
             model = LinearNet(d, 4).to(device)
             return model
+

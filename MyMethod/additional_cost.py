@@ -262,6 +262,8 @@ class AdditionalCost(BaseMethod):
 
                     outputs_meta_j = F.sigmoid(self.model_meta(data_x,
                                                                one_hot_j))
+                    outputs_meta_j /= torch.sum(outputs_meta_j, dim=1,
+                                                keepdim=True)  # normalize
                     prob_meta_j, _ = \
                         torch.max(1 - torch.matmul(outputs_meta_j.data,
                                                    self.loss_matrix),

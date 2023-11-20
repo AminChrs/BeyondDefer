@@ -1,8 +1,9 @@
-from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
-from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
-from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
+# from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
+# from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
+# from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
 from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
-from Experiments.basic import general_experiment, plot_cov_vs_acc
+from Experiments.basic import plot_cov_vs_acc
+from Experiments.basic import active_experiment
 from Experiments.basic_parallel import experiment_parallel, return_res
 from metrics.metrics import aggregate_plots
 import warnings
@@ -30,40 +31,55 @@ def acc_cov_init():
 def acc_cov_loop(res, iter):
 
     results = {}
-    # Cifar
-    dataset_cifar = CifarSynthDataset(5, False, batch_size=512)
-    packed_res = general_experiment(dataset_cifar, "cifar_synth",
-                                    res.epochs[0], 10, device,
-                                    subsample=False, iter=0)
-    results["cifar"] = list(packed_res)
+    # # Cifar
+    # dataset_cifar = CifarSynthDataset(5, False, batch_size=512)
+    # packed_res = general_experiment(dataset_cifar, "cifar_synth",
+    #                                 res.epochs[0], 10, device,
+    #                                 subsample=False, iter=0)
+    # res_active = active_experiment(dataset_cifar, "cifar_synth",
+    #                                res.epochs[0], 10, 1,
+    #                                device=device,)
+    # packed_res = packed_res + (res_active,)
+    # results["cifar"] = list(packed_res)
 
     # CIFAR10H
     dataset_cifar10h = Cifar10h(False, data_dir='./data')
-    packed_res = general_experiment(dataset_cifar10h, "cifar_10h",
-                                    res.epochs[1], 10, device,
-                                    subsample=False, iter=0)
-
+    # packed_res = general_experiment(dataset_cifar10h, "cifar_10h",
+    #                                 res.epochs[1], 10, device,
+    #                                 subsample=False, iter=0)
+    res_active = active_experiment(dataset_cifar10h, "cifar_10h",
+                                   res.epochs[1], 10, 1,
+                                   device=device,)
+    packed_res = (res_active,)  # packed_res + (res_active,)
     results["cifar10h"] = list(packed_res)
 
     # Hate Speech
-    dataset_hate = HateSpeech("./data/", True, False, 'random_annotator',
-                              device)
-    packed_res = general_experiment(dataset_hate, "hatespeech",
-                                    res.epochs[2], 3, device,
-                                    subsample=False, iter=0)
-    results["hatespeech"] = list(packed_res)
+    # dataset_hate = HateSpeech("./data/", True, False, 'random_annotator',
+    #                           device)
+    # packed_res = general_experiment(dataset_hate, "hatespeech",
+    #                                 res.epochs[2], 3, device,
+    #                                 subsample=False, iter=0)
+    # res_active = active_experiment(dataset_hate, "hatespeech",
+    #                                res.epochs[2], 3, 1,
+    #                                device=device,)
+    # packed_res = packed_res + (res_active,)
+    # results["hatespeech"] = list(packed_res)
 
-    # Imagenet
-    dataset_imagenet = ImageNet16h(False,
-                                   data_dir="./data/osfstorage-archive/",
-                                   noise_version="110",
-                                   batch_size=32,
-                                   test_split=0.2,
-                                   val_split=0.01)
-    packed_res = general_experiment(dataset_imagenet, "imagenet",
-                                    res.epochs[3], 16, device,
-                                    subsample=False, iter=0)
-    results["imagenet"] = list(packed_res)
+    # # Imagenet
+    # dataset_imagenet = ImageNet16h(False,
+    #                                data_dir="./data/osfstorage-archive/",
+    #                                noise_version="110",
+    #                                batch_size=32,
+    #                                test_split=0.2,
+    #                                val_split=0.01)
+    # packed_res = general_experiment(dataset_imagenet, "imagenet",
+    #                                 res.epochs[3], 16, device,
+    #                                 subsample=False, iter=0)
+    # res_active = active_experiment(dataset_imagenet, "imagenet",
+    #                                res.epochs[3], 16, 1,
+    #                                device=device,)
+    # packed_res = packed_res + (res_active,)
+    # results["imagenet"] = list(packed_res)
     return return_res(results=results,
                       datasets=res.datasets,
                       methods=res.methods,
@@ -82,6 +98,7 @@ def acc_cov_conc(cls, res):
             covs = []
             Res = []
             for i in range(len(res)):
+                logging.info("Iter: {}".format(i))
                 accs_i = [m["system_acc"] for m
                           in res[i].results[dataset][j]]
                 covs_i = [m["coverage"] for m
@@ -108,5 +125,5 @@ def cov_acc_parallel(iter):
                                    acc_cov_init,
                                    acc_cov_conc,
                                    10,
-                                   "data/acc_vs_cov/")
+                                   "data/acc_vs_cov/cifar10h")
     Parallel.run(parallel=True, iter=iter)

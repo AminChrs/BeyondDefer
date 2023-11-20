@@ -32,33 +32,6 @@ class CompareConfMetaCost(BaseMethod):
         self.threshold_rej = 0
         self.loss_matrix = loss_matrix.to(device)
 
-    def LossBCEH(self, outputs, y, outputs_meta, outputs_human):
-        num_classes = outputs.size()[1]
-        y_oh = F.one_hot(y, num_classes=num_classes).float()
-        m = torch.argmax(outputs_meta, dim=1).float()
-        y_oh[:, -1] = (m == y).float()
-        m2 = outputs_human
-        y_oh[:, -2] = (m2 == y).float()
-        return F.binary_cross_entropy_with_logits(outputs, y_oh,
-                                                  reduction='none').sum(dim=1)
-
-    def LossBCE(self, outputs, y):
-        num_classes = outputs.size()[1]
-        y_oh = F.one_hot(y, num_classes=num_classes).float()
-        return F.binary_cross_entropy_with_logits(outputs, y_oh,
-                                                  reduction='none').sum(dim=1)
-
-    def surrogate_loss_bce(self, out_class, outputs_meta,
-                           data_y, outputs_human):
-        """
-        outputs: network outputs
-        m: cost of deferring to expert cost of classifier predicting
-         hum_preds == target
-        labels: target
-        """
-        return (self.LossBCEH(out_class, data_y, outputs_meta, outputs_human)
-                + self.LossBCE(outputs_meta, data_y)).mean()
-
     def fit_epoch(self, dataloader, n_classes, optimizer,
                   verbose=False, epoch=1, model="classifier"):
         """
@@ -93,15 +66,26 @@ class CompareConfMetaCost(BaseMethod):
                 loss = criterion(outputs_meta, data_y)
             elif model == "defer_meta":
                 outputs_meta = self.model_meta(data_x, one_hot_m)
-                meta_correct = torch.argmax(outputs_meta, dim=1) == data_y
-                meta_correct = meta_correct.long().detach()
+                _, pred_meta = torch.max(1 - torch.matmul(outputs_meta.data,
+                                                          self.loss_matrix),
+                                         1)
+                meta_conf = 1 - self.loss_cost_sensitive(self.loss_matrix,
+                                                         data_y, pred_meta)
+                meta_loss = 1 - meta_conf
+                label_meta_defer = torch.cat((meta_loss.unsqueeze(1),
+                                              meta_conf.unsqueeze(1)),
+                                             dim=1)
                 outputs_defer_meta = self.model_defer_meta(data_x)
-                loss = criterion(outputs_defer_meta, meta_correct)
+                loss = F.cross_entropy(outputs_defer_meta, label_meta_defer)
             elif model == "defer":
-                human_correct = hum_preds == data_y
-                human_correct = human_correct.long().detach()
+                human_conf = 1 - self.loss_cost_sensitive(self.loss_matrix,
+                                                          data_y, hum_preds)
+                human_loss = 1 - human_conf
+                label_human_defer = torch.cat((human_loss.unsqueeze(1),
+                                               human_conf.unsqueeze(1)),
+                                              dim=1)
                 outputs_defer = self.model_defer(data_x)
-                loss = criterion(outputs_defer, human_correct)
+                loss = criterion(outputs_defer, label_human_defer)
             outputs_classifier = self.model_classifier(data_x)
             outputs_meta = self.model_meta(data_x, one_hot_m)
 
@@ -167,6 +151,9 @@ class CompareConfMetaCost(BaseMethod):
         best_model_classifier = copy.deepcopy(
                                 self.model_classifier.state_dict())
         best_model_meta = copy.deepcopy(self.model_meta.state_dict())
+        best_model_defer = copy.deepcopy(self.model_defer.state_dict())
+        best_model_defer_meta = copy.deepcopy(
+                                self.model_defer_meta.state_dict())
         for epoch in tqdm(range(epochs)):
             self.fit_epoch(dataloader_train, n_classes, optimizer, verbose,
                            epoch, model="classifier")
@@ -187,12 +174,19 @@ class CompareConfMetaCost(BaseMethod):
                                     self.model_classifier.state_dict())
                     best_model_meta = copy.deepcopy(
                                     self.model_meta.state_dict())
+                    best_model_defer = copy.deepcopy(
+                                    self.model_defer.state_dict())
+                    best_model_defer_meta = copy.deepcopy(
+                                    self.model_defer_meta.state_dict())
+                                
                 if verbose:
                     logging.info(compute_additional_defer_metrics(data_test))
             if scheduler is not None:
                 scheduler.step()
         self.model_classifier.load_state_dict(best_model_classifier)
         self.model_meta.load_state_dict(best_model_meta)
+        self.model_defer.load_state_dict(best_model_defer)
+        self.model_defer_meta.load_state_dict(best_model_defer_meta)
         final_test = self.test(dataloader_test, n_classes)
         return compute_additional_defer_metrics(final_test)
 
@@ -235,7 +229,9 @@ class CompareConfMetaCost(BaseMethod):
                     torch.max(1 - torch.matmul(outputs_classifier.data,
                                                self.loss_matrix),
                               1)
-                _, pred_meta = torch.max(outputs_meta.data, 1)
+                _, pred_meta = torch.max(1 - torch.matmul(outputs_meta.data,
+                                                          self.loss_matrix),
+                                         1)
                 prob_posthoc = F.softmax(self.model_defer_meta(data_x),
                                          dim=1)[:, 1]
 
@@ -275,8 +271,8 @@ class CompareConfMetaCost(BaseMethod):
 
     def loss_cost_sensitive(self, loss_matrix, y, y_pred):
         num_classes = loss_matrix.shape[0]
-        y_oh = F.one_hot(y, num_classes=num_classes).float()
-        yp_oh = F.one_hot(y_pred, num_classes=num_classes).float()
+        y_oh = F.one_hot(y, num_classes=num_classes).float().detach()
+        yp_oh = F.one_hot(y_pred, num_classes=num_classes).float().detach()
         is_loss = torch.matmul(torch.matmul(y_oh, loss_matrix),
                                yp_oh.transpose(0, 1))
         is_loss = torch.diag(is_loss).float()

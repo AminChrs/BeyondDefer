@@ -9,6 +9,7 @@ from metrics.metrics import aggregate_plots
 from torch.utils.data import DataLoader
 from MyNet.call_net import networks, optimizer_scheduler
 from MyMethod.additional_cost import AdditionalCost
+from MyMethod.CompareConfMetaCost import CompareConfMetaCost
 from baselines.lce_cost import LceCost
 from baselines.compare_confidence_cost import CompareConfCost
 from baselines.one_v_all_cost import OVACost
@@ -52,6 +53,19 @@ def general_experiment_cost(dataset, dataset_name, epochs, num_classes, device,
     test_data = AB.test(dataset.data_test_loader, num_classes)
     res_AB = cov_vs_acc_add(test_data, method=method, loss_matrix=loss_matrix)
 
+    # CCMC
+    logging.info("Compare Confidence Meta")
+    classifier, meta, defer, defer_meta = networks(dataset_name,
+                                                   "CompConfMeta", device)
+    CCMC = CompareConfMetaCost(10, classifier, meta, defer, defer_meta, device,
+                               loss_matrix)
+    optimizer, scheduler = optimizer_scheduler()
+    CCMC.fit(dataset.data_train_loader, dataset.data_val_loader,
+             dataset.data_test_loader, num_classes, epochs, optimizer, lr=1e-3,
+             scheduler=scheduler, verbose=False)
+    test_data = CCMC.test(dataset.data_test_loader, num_classes)
+    res_CCMC = cov_vs_acc_add(test_data, method=method,
+                              loss_matrix=loss_matrix)
     # CC
     logging.info("Compare Confidence")
     model_class, model_expert = networks(dataset_name, "confidence", device)
@@ -109,20 +123,18 @@ def general_experiment_cost(dataset, dataset_name, epochs, num_classes, device,
     test_data = OVA.test(dataset.data_test_loader)
     res_OVA = compute_coverage_v_acc_curve(test_data, method=method,
                                            loss_matrix=loss_matrix)
-    if method == "cov":
-        return res_AB, res_CC, res_LCE, res_OVA
-    else:
-        return res_AB, res_CC, res_LCE, res_OVA
+    return res_AB, res_CCMC, res_CC, res_LCE, res_OVA
 
 
 def acc_cov_cost_init():
-    methods = ["Additional Beyond Defer", "Compare Confidences",
+    methods = ["Additional Beyond Defer", "Compare Confidence Meta",
+               "Compare Confidences",
                "Cross Entropy", "One-vs-All"]
     datasets = ["cifar", "cifar10h", "hatespeech", "imagenet"]
     res_dir = "./Results/loss_vs_cov_cost/"
-    # epochs = [150, 150, 150, 150]
+    epochs = [150, 150, 150, 150]
     # epochs = [1, 1, 1, 1]
-    epochs = [30, 30, 30, 30]
+    # epochs = [30, 30, 30, 30]
     return return_res(methods=methods, res_dir=res_dir, epochs=epochs,
                       datasets=datasets)
 
@@ -220,6 +232,6 @@ def cov_loss_parallel(iter):
     Parallel = experiment_parallel(acc_cov_cost_loop,
                                    acc_cov_cost_init,
                                    acc_cov_cost_conc,
-                                   20,
+                                   10,
                                    "data/loss_vs_cov/")
     Parallel.run(parallel=True, iter=iter)

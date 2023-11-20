@@ -61,7 +61,7 @@ def SampleComp_init():
     methods = ["Beyond Defer", "Additional Defer",
                "Learned Beyond",
                "Reallizable Surrogate", "Compare Confindences",
-               "One-versus-All", "Cross Entropy"]
+               "One-versus-All", "Cross Entropy", "AFE"]
     res_dir = "Results/SampleComp/"
 
     dataset_cifar = CifarSynthDataset(5, False, batch_size=512)
@@ -78,7 +78,7 @@ def SampleComp_init():
     datasets = [dataset_cifar, dataset_cifar10h, dataset_hate,
                 dataset_imagenet]
     break_flag = False
-    epochs = [1, 1, 1, 1]  # [150, 150, 150, 150]
+    epochs = [150, 150, 150, 150]
     num_classes = [10, 10, 3, 16]
     num_samples_per_iter = 10000
     names = ["cifar_synth", "cifar_10h", "hatespeech", "imagenet"]

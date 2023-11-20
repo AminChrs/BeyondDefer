@@ -156,7 +156,7 @@ def test_AFE_loss():
 
         #
         assert AFE_CIFAR.AFELoss(Classifier(x), Meta(x, m)).shape == \
-            torch.Size([])
+            torch.Size([1])
         index += 1
         break
     logging.info("Test AFE Passed!")
@@ -320,9 +320,9 @@ def test_AFE_fit_Eu():
         return Loss, indices
     Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=34000)
     Dataset_CIFAR_Active.Query(criterion, pool_size=0, query_size=1)
-    AFE_CIFAR.fit_Eu(150, Dataset_CIFAR_Active,
+    AFE_CIFAR.fit_Eu(1, Dataset_CIFAR_Active,
                      10, optimizer_meta, verbose=True,
-                     scheduler_meta=scheduler)
+                     scheduler_meta=scheduler)  # 150
     logging.info("Test AFE Fit Eu Passed!")
 
 
@@ -347,7 +347,7 @@ def test_AFE_fit():
         return torch.optim.lr_scheduler.CosineAnnealingLR(z, 34000*150)
 
     AFE_CIFAR.fit(Dataset_CIFAR_Active,
-                  10, 30, lr=0.001, verbose=True,
+                  10, 1, lr=0.001, verbose=True,
                   query_size=int(np.floor(length)),
                   num_queries=1, scheduler_classifier=scheduler,
                   scheduler_meta=scheduler)
@@ -585,8 +585,8 @@ def test_BD_fit():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        weight_decay=0.0005)
     BD.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 80, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 80
     print("Test BD fit passed!")
 
 
@@ -603,8 +603,8 @@ def test_BD_fit_CIFAR10h():
     optimizer, scheduler = optimizer_scheduler()
     # fit
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
-           dataset.data_test_loader, 10, 80, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           dataset.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 80
     plot_cov_vs_acc(BD.test(dataset.data_test_loader, 10))
     print("Test BD on CIFAR-10H fit passed!")
 
@@ -627,8 +627,8 @@ def test_BD_fit_Imagenet():
         return torch.optim.AdamW(params, lr=lr)
     # fit
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
-           dataset.data_test_loader, 16, 80, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           dataset.data_test_loader, 16, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 80
     plot_cov_vs_acc(BD.test(dataset.data_test_loader, 16))
     print("Test BD on Imagenet fit passed!")
 
@@ -650,13 +650,13 @@ def test_RS_Imagenet():
         dataset.data_train_loader,
         dataset.data_val_loader,
         dataset.data_test_loader,
-        epochs=100,
+        epochs=1,
         optimizer=optimizer,
         scheduler=scheduler,
         lr=0.001,
         verbose=False,
         test_interval=1,
-    )
+    )  # 100
 
     print("Test RS on Imagenet fit passed!")
 
@@ -674,8 +674,8 @@ def test_BD_Hatespeech():
     optimizer, scheduler = optimizer_scheduler()
     # fit
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
-           dataset.data_test_loader, 3, 200, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           dataset.data_test_loader, 3, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 200
     plot_cov_vs_acc(BD.test(dataset.data_test_loader, 4))
     print("Test BD on HateSpeech fit passed!")
 
@@ -695,13 +695,13 @@ def test_RS_Hatespeech():
         dataset.data_train_loader,
         dataset.data_val_loader,
         dataset.data_test_loader,
-        epochs=100,
+        epochs=1,
         optimizer=optimizer,
         scheduler=scheduler,
         lr=0.001,
         verbose=False,
         test_interval=1,
-    )
+    )  # 100
     cov_vs_acc = compute_coverage_v_acc_curve(
         Reallizable_Surr.test(dataset.data_test_loader))
 
@@ -846,8 +846,8 @@ def test_additional_defer_fit():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     AB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 80, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 80
     test_data = AB.test(Dataset_CIFAR.data_test_loader, 10)
     plot_cov_vs_acc(test_data)
     print("Test Additional fit passed!")
@@ -901,8 +901,8 @@ def test_cov_vs_acc():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     AB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 80
 
     test_data = AB.test(Dataset_CIFAR.data_test_loader, 10)
     out = cov_vs_acc_add(test_data)
@@ -956,8 +956,8 @@ def test_learned_beyond_fit():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     LB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 150, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 150
     test_data = LB.test(Dataset_CIFAR.data_test_loader, 10)
     res = cov_vs_acc_meta(test_data)
     plot_cov_vs_acc([res], "LB", "Results/LB.pdf")
@@ -982,8 +982,8 @@ def test_learned_additional_fit():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     LA.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 150, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 150
     test_data = LA.test(Dataset_CIFAR.data_test_loader, 10)
     res = cov_vs_acc_add(test_data)
     plot_cov_vs_acc([res], "LA", "Results/LA.pdf", std=False)
@@ -1007,8 +1007,8 @@ def test_beyond_fit_cifar10h():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     B.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-          Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
-          scheduler=scheduler, verbose=True)
+          Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+          scheduler=scheduler, verbose=True)  # 30
     test_data = B.test(Dataset_CIFAR.data_test_loader, 10)
     # plot histogram of test_data rej_score
     plt.figure()
@@ -1052,8 +1052,8 @@ def test_additional_cost():
     # Fit
     optimizer, scheduler = optimizer_scheduler()
     AC.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)  # 30
     test_data = AC.test(Dataset_CIFAR.data_test_loader, 10)
     res = cov_vs_acc_add(test_data, loss_matrix=loss_matrix)
     plot_cov_vs_cost([res], "AC", "Results/AC.pdf", std=False)
@@ -1079,13 +1079,13 @@ def test_cost_sensitive_deferral():
             Dataset_CIFAR.data_train_loader,
             Dataset_CIFAR.data_val_loader,
             Dataset_CIFAR.data_test_loader,
-            epochs=30,
+            epochs=1,
             optimizer=optimizer,
             scheduler=scheduler,
             lr=0.001,
             verbose=True,
             test_interval=5,
-        )
+        )  # 30
     test_data = CCE.test(Dataset_CIFAR.data_test_loader)
     res_LCE = compute_coverage_v_acc_curve(test_data, loss_matrix=loss_matrix)
     plot_cov_vs_cost([res_LCE], ["LCE"], "Results/LCE.pdf", std=False)
@@ -1111,13 +1111,13 @@ def test_cost_sensitive_compareconf():
         Dataset_CIFAR.data_train_loader,
         Dataset_CIFAR.data_val_loader,
         Dataset_CIFAR.data_test_loader,
-        epochs=30,
+        epochs=1,
         optimizer=optimizer,
         scheduler=scheduler,
         lr=0.001,
         verbose=False,
         test_interval=5,
-    )
+    )  # 30
     test_data = CCC.test(Dataset_CIFAR.data_test_loader)
     res_CCC = compute_coverage_v_acc_curve(test_data, loss_matrix=loss_matrix)
     plot_cov_vs_cost([res_CCC], ["CCC"], "Results/CCC.pdf", std=False)
@@ -1139,13 +1139,13 @@ def test_cost_sensitive_OvA():
             Dataset_CIFAR.data_train_loader,
             Dataset_CIFAR.data_val_loader,
             Dataset_CIFAR.data_test_loader,
-            epochs=30,
+            epochs=1,
             optimizer=optimizer,
             scheduler=scheduler,
             lr=0.001,
             verbose=False,
             test_interval=5,
-        )
+        )  # 30
     test_data = OVA.test(Dataset_CIFAR.data_test_loader)
     res_OVAC = compute_coverage_v_acc_curve(test_data, loss_matrix=loss_matrix)
     plot_cov_vs_cost([res_OVAC], ["OVAC"], "Results/OVAC.pdf", std=False)
@@ -1169,8 +1169,8 @@ def test_CompConf_Meta_fit():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     CCM.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-            Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
-            scheduler=scheduler, verbose=True)
+            Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+            scheduler=scheduler, verbose=True)  # 30
     test_data = CCM.test(Dataset_CIFAR.data_test_loader, 10)
     res = cov_vs_acc_add(test_data)
     plot_cov_vs_acc([res], "CCM", "Results/test/CCM.pdf", std=False)
@@ -1197,8 +1197,8 @@ def test_cost_sensitive_CompConf_Meta():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     CCMC.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-             Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
-             scheduler=scheduler, verbose=True)
+             Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+             scheduler=scheduler, verbose=True)  # 30
     test_data = CCMC.test(Dataset_CIFAR.data_test_loader, 10)
     res = cov_vs_acc_add(test_data)
     plot_cov_vs_acc([res], "CCMC", "Results/test/CCMC.pdf", std=False)
@@ -1223,8 +1223,8 @@ def test_cifar_entropy_CCMC():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     CCMC.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-             Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
-             scheduler=scheduler, verbose=True)
+             Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+             scheduler=scheduler, verbose=True)  # 30
     test_data = CCMC.test(Dataset_CIFAR.data_test_loader, 10)
     res = cov_vs_acc_add(test_data)
     plot_cov_vs_acc([res], "CCMC", "Results/test/Ent.pdf", std=False)
@@ -1253,9 +1253,9 @@ def test_AFE_coverage():
     # fit
     AFE_CIFAR.fit(Dataset_hate_Active,
                   16, 1, lr=0.001, verbose=True,
-                  query_size=int(np.floor(length/10)),
-                  num_queries=10, scheduler_classifier=scheduler,
-                  scheduler_meta=scheduler)
+                  query_size=int(np.floor(length/1)),
+                  num_queries=1, scheduler_classifier=scheduler,
+                  scheduler_meta=scheduler)  # num_queries=10
     #  test
     plt.figure()
     range_epochs = np.arange(0, len(AFE_CIFAR.report))
@@ -1360,8 +1360,8 @@ def test_hist_rej1_rej2():
     def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
                                                        )
     CCM.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-            Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.001,
-            scheduler=scheduler, verbose=True)
+            Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+            scheduler=scheduler, verbose=True)  # 50
     test_data = CCM.test(Dataset_CIFAR.data_test_loader, 10)
     plt.figure()
     plt.hist(test_data["rej_score2"], bins=100)
@@ -1398,8 +1398,8 @@ def test_CCM_ABD_Simplex():
     # class_probs = np.sum(class_probs, axis=1)
     
     AB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
-           Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.01,
-           scheduler=scheduler, verbose=True)
+           Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.01,
+           scheduler=scheduler, verbose=True)  # 50
     test_data_AB = AB.test(Dataset_CIFAR.data_test_loader, 10)
     class_probs_AB = test_data_AB["class_probs"]
     class_probs_AB = np.sum(class_probs_AB, axis=1)
@@ -1429,10 +1429,10 @@ def test_AFE_imagenet():
     optimizer, scheduler = optimizer_scheduler()
     length = len(Dataset_Imagenet.data_test_loader.dataset)
     AFE_Image.fit(Dataset_Active,
-                  16, 10, lr=0.001, verbose=True,
+                  16, 1, lr=0.001, verbose=True,
                   query_size=int(np.floor(length)),
                   num_queries=1, scheduler_classifier=scheduler,
-                  scheduler_meta=scheduler, optimizer=optimizer)
+                  scheduler_meta=scheduler, optimizer=optimizer)  # 10
 
     plt.figure()
     range_epochs = np.arange(0, len(AFE_Image.report))

@@ -5,16 +5,24 @@ from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
 from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
 from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
 from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
-from metrics.metrics import compute_coverage_v_acc_curve
-from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add
-from Experiments.basic import plot_cov_vs_acc
-# from metrics.metrics import
-# compute_additional_defer_metrics
-# from metrics.metrics import compute_metalearner_metrics
+from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
+from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add, cov_vs_acc_AFE
+from Experiments.basic import plot_cov_vs_acc, plot_cov_vs_cost
+from MyMethod.additional_cost import AdditionalCost
+from baselines.lce_cost import LceCost
+from baselines.compare_confidence_cost import CompareConfCost
+from baselines.one_v_all_cost import OVACost
+from MyMethod.CompareConfMeta import CompareConfMeta
+from MyMethod.CompareConfMetaCost import CompareConfMetaCost
 from MyNet.networks import MetaNet
 from MyMethod.beyond_defer import BeyondDefer
 from MyMethod.additional_defer import AdditionalBeyond
 from human_ai_defer.networks.cnn import NetSimple
+from MyMethod.learned_beyond import LearnedBeyond
+from MyMethod.learned_additional import LearnedAdditional
+from Datasets.cifar import CifarSynthDatasetEnt
+# from Experiments.comparison import Exp_lb_parallel
+from Experiments.comparison import SetFunction
 # from metrics.metrics import plot_cov_vs_acc
 from Experiments.basic_parallel import experiment_parallel, return_res
 import torch
@@ -325,7 +333,7 @@ def test_AFE_fit():
     Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
     Dataset_CIFAR_Active = ActiveDataset(Dataset_CIFAR)
     # find data loader length
-    length = len(Dataset_CIFAR_Active.data_train_loader)
+    length = len(Dataset_CIFAR_Active.data_train_loader.dataset)
 
     # Classifier
     Classifier = NetSimple(10, 50, 50, 100, 20).to(device)
@@ -339,22 +347,15 @@ def test_AFE_fit():
         return torch.optim.lr_scheduler.CosineAnnealingLR(z, 34000*150)
 
     AFE_CIFAR.fit(Dataset_CIFAR_Active,
-                  10, 150, lr=0.001, verbose=True,
-                  query_size=int(np.floor(length/10)),
-                  num_queries=10, scheduler_classifier=scheduler,
+                  10, 30, lr=0.001, verbose=True,
+                  query_size=int(np.floor(length)),
+                  num_queries=1, scheduler_classifier=scheduler,
                   scheduler_meta=scheduler)
     with open('AFE_CIFAR_report.json', 'w') as fp:
         json.dump(AFE_CIFAR.report, fp)
     with open('AFE_CIFAR_report.json', 'r') as fp:
         AFE_CIFAR.report = json.load(fp)
-    plt.figure()
-    range_epochs = np.arange(0, len(AFE_CIFAR.report))
-    accuracies = []
-    for i in range_epochs:
-        accuracies.append(AFE_CIFAR.report[i]
-                          ["test_metrics_meta"]["system_acc"])
-    plt.plot(range_epochs, accuracies)
-    plt.savefig("Results/AFE_CIFAR_system_acc.png")
+
     logging.info("Test AFE fit passed!")
 
 
@@ -906,7 +907,548 @@ def test_cov_vs_acc():
     test_data = AB.test(Dataset_CIFAR.data_test_loader, 10)
     out = cov_vs_acc_add(test_data)
     plot_cov_vs_acc([out], "AB", "Results/AB.pdf")
-     
+
+
+def test_learned_beyond_loss():
+    # image
+    dataset = CifarSynthDataset(5, False, batch_size=512)
+
+    # models
+    classifier, meta = networks("cifar_synth", "LearnedBeyond", device)
+
+    # Additional
+    Add = LearnedBeyond(10, classifier, meta, device)
+
+    x, y, m = next(iter(dataset.data_train_loader))
+    # make m one-hot
+    m_oh = torch.nn.functional.one_hot(m, num_classes=10).float()
+    x = x.to(device)
+    y = y.to(device)
+    m = m.to(device)
+    m_oh = m_oh.to(device)
+    assert m_oh.shape == torch.Size([512, 10])
+    model_pred = classifier(x)
+    meta_pred = meta(x, m_oh)
+
+    loss = Add.surrogate_loss_bce(model_pred, meta_pred, y)
+    print("loss: ", loss)
+    assert isinstance(loss, torch.Tensor)
+    assert not np.isnan(loss.detach().cpu().numpy()).any()
+    assert loss.shape == torch.Size([])
+    assert loss >= 0
+    print("Test Learned Loss passed!")
+
+
+def test_learned_beyond_fit():
+    # Image
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+
+    # Initialize method
+    classifier, meta = networks("cifar_synth", "LearnedBeyond", device)
+
+    LB = LearnedBeyond(10, classifier, meta, device)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    LB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+           Dataset_CIFAR.data_test_loader, 10, 150, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    test_data = LB.test(Dataset_CIFAR.data_test_loader, 10)
+    res = cov_vs_acc_meta(test_data)
+    plot_cov_vs_acc([res], "LB", "Results/LB.pdf")
+
+    print("Test Additional fit passed!")
+
+
+def test_learned_additional_fit():
+    # Image
+    expert_k = 5
+    Dataset_CIFAR = CifarSynthDataset(expert_k, False, batch_size=512)
+
+    # Initialize method
+    classifier, meta = networks("cifar_synth", "LearnedAdditional", device)
+
+    LA = LearnedAdditional(10, classifier, meta, device)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    LA.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+           Dataset_CIFAR.data_test_loader, 10, 150, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    test_data = LA.test(Dataset_CIFAR.data_test_loader, 10)
+    res = cov_vs_acc_add(test_data)
+    plot_cov_vs_acc([res], "LA", "Results/LA.pdf", std=False)
+    print("Test Learned Additional fit passed!")
+
+
+def test_beyond_fit_cifar10h():
+
+    # Image
+    Dataset_CIFAR = Cifar10h(False, data_dir='./data')
+
+    # Initialize method
+    classifier, human, meta = networks("cifar_10h", "BD", device)
+
+    B = BeyondDefer(10, classifier, human, meta, device)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    B.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+          Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
+          scheduler=scheduler, verbose=True)
+    test_data = B.test(Dataset_CIFAR.data_test_loader, 10)
+    # plot histogram of test_data rej_score
+    plt.figure()
+    plt.hist(test_data["rej_score"], bins=100)
+    plt.savefig("./BD_hist.pdf")
+    res = cov_vs_acc_meta(test_data, method="c")
+    accs = [m["system_acc"] for m in res]
+    covs = [m["coverage"] for m in res]
+    c = np.arange(0, 1, 1 / len(accs))
+    loss = 1 - np.array(accs) + (1 - np.array(covs))*c
+    acc_part = 1 - np.array(accs)
+    cov_part = (1 - np.array(covs))*c
+    Res = []
+    for i in range(len(accs)):
+        Res.append({"system_acc": accs[i], "c": c[i],
+                    "coverage": covs[i], "loss": loss[i]})
+    plot_cov_vs_acc([Res], ["BD"], "BD.pdf", method="c",
+                    is_loss=True)
+    plt.figure()
+    plt.plot(c, acc_part, label="acc part")
+    plt.plot(c, cov_part, label="cov part")
+    plt.plot(c, np.array(covs), label="cov")
+    plt.legend()
+    plt.savefig("./BD_parts.pdf")
+    print("Test Beyond fit passed!")
+
+
+def test_additional_cost():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDataset(5, False, batch_size=512)
+
+    # Initialize method
+    classifier, human, meta = networks("cifar_synth", "Additional", device)
+
+    # loss
+    loss_matrix = torch.ones(10, 10) - torch.eye(10)
+    # loss_matrix = torch.rand(10, 10)
+    AC = AdditionalCost(10, classifier, human, meta, device, loss_matrix)
+
+    # Fit
+    optimizer, scheduler = optimizer_scheduler()
+    AC.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+           Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
+           scheduler=scheduler, verbose=True)
+    test_data = AC.test(Dataset_CIFAR.data_test_loader, 10)
+    res = cov_vs_acc_add(test_data, loss_matrix=loss_matrix)
+    plot_cov_vs_cost([res], "AC", "Results/AC.pdf", std=False)
+    print("Test Additional fit passed!")
+
+
+def test_cost_sensitive_deferral():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDataset(5, False, batch_size=512)
+
+    # Initialize method
+    classifier = networks("cifar_synth", "LCE", device)
+
+    # loss
+    loss_matrix = torch.ones(10, 10) - torch.eye(10)
+
+    # Fit
+    optimizer, scheduler = optimizer_scheduler()
+    CCE = LceCost(1, 2, classifier, device)
+    CCE.set_loss_matrix(loss_matrix)
+    CCE.fit_hyperparam(
+            Dataset_CIFAR.data_train_loader,
+            Dataset_CIFAR.data_val_loader,
+            Dataset_CIFAR.data_test_loader,
+            epochs=30,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            lr=0.001,
+            verbose=True,
+            test_interval=5,
+        )
+    test_data = CCE.test(Dataset_CIFAR.data_test_loader)
+    res_LCE = compute_coverage_v_acc_curve(test_data, loss_matrix=loss_matrix)
+    plot_cov_vs_cost([res_LCE], ["LCE"], "Results/LCE.pdf", std=False)
+    logging.info("Results: {}".format(test_data))
+
+
+def test_cost_sensitive_compareconf():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDataset(5, False, batch_size=512)
+
+    # Initialize method
+    classifier, expert = networks("cifar_synth", "confidence", device)
+
+    # loss
+    loss_matrix = torch.ones(10, 10) - torch.eye(10)
+
+    # Fit
+    optimizer, scheduler = optimizer_scheduler()
+    CCC = CompareConfCost(classifier, expert, device)
+    CCC.set_loss_matrix(loss_matrix)
+    CCC.fit(
+        Dataset_CIFAR.data_train_loader,
+        Dataset_CIFAR.data_val_loader,
+        Dataset_CIFAR.data_test_loader,
+        epochs=30,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        lr=0.001,
+        verbose=False,
+        test_interval=5,
+    )
+    test_data = CCC.test(Dataset_CIFAR.data_test_loader)
+    res_CCC = compute_coverage_v_acc_curve(test_data, loss_matrix=loss_matrix)
+    plot_cov_vs_cost([res_CCC], ["CCC"], "Results/CCC.pdf", std=False)
+    logging.info("Test cost sensitive compareconf passed!")
+
+
+def test_cost_sensitive_OvA():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDataset(5, False, batch_size=512)
+
+    # Initialize method
+    model = networks("cifar_synth", "OVA", device)
+    optimizer, scheduler = optimizer_scheduler()
+    OVA = OVACost(1, 2, model, device)
+    loss_matrix = torch.ones(10, 10) - torch.eye(10)
+    OVA.set_loss_matrix(loss_matrix)
+    OVA.fit(
+            Dataset_CIFAR.data_train_loader,
+            Dataset_CIFAR.data_val_loader,
+            Dataset_CIFAR.data_test_loader,
+            epochs=30,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            lr=0.001,
+            verbose=False,
+            test_interval=5,
+        )
+    test_data = OVA.test(Dataset_CIFAR.data_test_loader)
+    res_OVAC = compute_coverage_v_acc_curve(test_data, loss_matrix=loss_matrix)
+    plot_cov_vs_cost([res_OVAC], ["OVAC"], "Results/OVAC.pdf", std=False)
+    logging.info("Test cost sensitive OvA passed!")
+
+
+def test_CompConf_Meta_fit():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDataset(5, False, batch_size=512)
+
+    # Initialize method
+    classifier, meta, defer, defer_meta = networks("cifar_synth",
+                                                   "CompConfMeta", device)
+    CCM = CompareConfMeta(10, classifier, meta, defer, defer_meta, device)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    CCM.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+            Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
+            scheduler=scheduler, verbose=True)
+    test_data = CCM.test(Dataset_CIFAR.data_test_loader, 10)
+    res = cov_vs_acc_add(test_data)
+    plot_cov_vs_acc([res], "CCM", "Results/test/CCM.pdf", std=False)
+
+    print("Test CompConf_Meta_fit passed!")
+
+
+def test_cost_sensitive_CompConf_Meta():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDataset(5, False, batch_size=512)
+
+    # Initialize method
+    classifier, meta, defer, defer_meta = networks("cifar_synth",
+                                                   "CompConfMeta", device)
+    loss_matrix = torch.ones(10, 10) - torch.eye(10)
+    CCMC = CompareConfMetaCost(10, classifier, meta, defer, defer_meta, device,
+                               loss_matrix=loss_matrix)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    CCMC.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+             Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
+             scheduler=scheduler, verbose=True)
+    test_data = CCMC.test(Dataset_CIFAR.data_test_loader, 10)
+    res = cov_vs_acc_add(test_data)
+    plot_cov_vs_acc([res], "CCMC", "Results/test/CCMC.pdf", std=False)
+
+    print("Test CompConf_Meta_Cost passed!")
+
+
+def test_cifar_entropy_CCMC():
+
+    # Image
+    Dataset_CIFAR = CifarSynthDatasetEnt(10, False, batch_size=512)
+    classifier, meta, defer, defer_meta = networks("cifar_synth",
+                                                   "CompConfMeta", device)
+    loss_matrix = torch.ones(10, 10) - torch.eye(10)
+    CCMC = CompareConfMetaCost(10, classifier, meta, defer, defer_meta, device,
+                               loss_matrix=loss_matrix)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    CCMC.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+             Dataset_CIFAR.data_test_loader, 10, 30, optimizer, lr=0.001,
+             scheduler=scheduler, verbose=True)
+    test_data = CCMC.test(Dataset_CIFAR.data_test_loader, 10)
+    res = cov_vs_acc_add(test_data)
+    plot_cov_vs_acc([res], "CCMC", "Results/test/Ent.pdf", std=False)
+    logging.info("Test cifar entropy passed!")
+
+
+def test_AFE_coverage():
+
+    # Hate speech
+    # Dataset_hate = HateSpeech("./data/", True, False, 'random_annotator',
+    #                           device)
+    Dataset_hate = ImageNet16h(False,
+                               data_dir="./data/osfstorage-archive/",
+                               noise_version="110",
+                               batch_size=32,
+                               test_split=0.2,
+                               val_split=0.01)
+    Dataset_hate_Active = ActiveDataset(Dataset_hate)
+    # find data loader length
+    length = len(Dataset_hate_Active.data_train_loader)
+    # networks
+    classifier, meta = networks("imagenet", "AFE", device)
+    # AFE
+    AFE_CIFAR = AFE(classifier, meta, device)
+    optimizer, scheduler = optimizer_scheduler()
+    # fit
+    AFE_CIFAR.fit(Dataset_hate_Active,
+                  16, 1, lr=0.001, verbose=True,
+                  query_size=int(np.floor(length/10)),
+                  num_queries=10, scheduler_classifier=scheduler,
+                  scheduler_meta=scheduler)
+    #  test
+    plt.figure()
+    range_epochs = np.arange(0, len(AFE_CIFAR.report))
+    accuracies = []
+
+    last_iter = len(AFE_CIFAR.report) - 1
+    rep = AFE_CIFAR.report[last_iter]
+    res = cov_vs_acc_AFE(rep)
+    plot_cov_vs_acc([res], ["AFE"], "Results/AFE_cov.pdf", std=False)
+
+    for i in range_epochs:
+        accuracies.append(AFE_CIFAR.report[i]
+                          ["test_metrics_meta"]["system_acc"])
+    plt.plot(range_epochs, accuracies)
+    plt.savefig("Results/AFE_CIFAR_system_acc.png")
+
+
+def test_set_optimization():
+
+    def function(x):
+        if len(x) == 0:
+            return 0
+        else:
+            x = np.array(x)
+            length = len(x)
+            if length < 5:
+                t = 0
+            else:
+                t = length - 5
+            return -np.sum(x) + t*10000
+
+    # Test data
+    data = []
+    for i in range(100):
+        rand = np.random.rand(1)
+        data.append(rand)
+
+    # Actual optimization
+    data_np = np.array(data)
+    data_np = np.sort(data_np, axis=0)
+    data_opt = data_np[-5:]
+    func_opt = function(data_opt)
+
+    # Greedy optimization
+    MySetFunc = SetFunction(function, data)
+    res = MySetFunc.min([], iter=1000)
+    logging.info("Result: {}".format(res))
+    logging.info("data opt: {}".format(data_opt))
+    logging.info("Optimal: {}".format(func_opt))
+    assert res[0] == func_opt
+
+
+def test_all_sizes():
+
+    # CIFAR-10K
+    Dataset_CIFAR = CifarSynthDataset(10, False, batch_size=512)
+
+    # CIFAR-10H
+    Dataset_CIFAR_H = Cifar10h(False, data_dir='./data')
+
+    # ImageNet-16H
+    Dataset_Imagenet = ImageNet16h(False,
+                                   data_dir="./data/osfstorage-archive/",
+                                   noise_version="110",
+                                   batch_size=32,
+                                   test_split=0.2,
+                                   val_split=0.01)
+
+    # Hate speech
+    Dataset_hate = HateSpeech("./data/", True, False, 'random_annotator',
+                              device)
+
+    all_datasets = [Dataset_CIFAR, Dataset_CIFAR_H, Dataset_Imagenet,
+                    Dataset_hate]
+
+    name_datasets = ["CIFAR-10K", "CIFAR-10H", "ImageNet-16H", "Hate Speech"]
+
+    for i, dataset in enumerate(all_datasets):
+        train_num = len(dataset.data_train_loader.dataset)
+        val_num = len(dataset.data_val_loader.dataset)
+        test_num = len(dataset.data_test_loader.dataset)
+        logging.info("Dataset: {}".format(name_datasets[i]))
+        logging.info("Train: {}".format(train_num))
+        logging.info("Val: {}".format(val_num))
+        logging.info("Test: {}".format(test_num))
+
+    logging.info("Test all sizes passed!")
+
+
+def test_hist_rej1_rej2():
+    Dataset_CIFAR = Cifar10h(False, data_dir='./data')
+
+    # Initialize method
+    classifier, meta, defer, defer_meta = \
+        networks("cifar_10h", "CompConfMeta", device)
+    CCM = CompareConfMeta(10, classifier, meta, defer, defer_meta, device)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    CCM.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+            Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.001,
+            scheduler=scheduler, verbose=True)
+    test_data = CCM.test(Dataset_CIFAR.data_test_loader, 10)
+    plt.figure()
+    plt.hist(test_data["rej_score2"], bins=100)
+    plt.savefig("./Results/CCM_hist1.pdf")
+    plt.figure()
+    plt.hist(test_data["rej_score2"]-test_data["rej_score1"], bins=100)
+    plt.savefig("./Results/CCM_hist2.pdf")
+    logging.info("Test hist rej1 rej2 passed!")
+
+
+def test_CCM_ABD_Simplex():
+    Dataset_CIFAR = Cifar10h(False, data_dir='./data')
+
+    # Initialize method
+    classifier, meta, defer, defer_meta = \
+        networks("cifar_10h", "CompConfMeta", device)
+    CompareConfMeta(10, classifier, meta, defer, defer_meta, device)
+
+    classifier_AB, human_AB, meta_AB = \
+        networks("cifar_10h", "Additional", device)
+    AB = AdditionalBeyond(10, classifier_AB, human_AB, meta_AB, device)
+
+    # Fit
+    def scheduler(z, length):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, length)
+
+    def optimizer(params, lr): return torch.optim.Adam(params, lr=lr,
+                                                       )
+    # CCM.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+    #         Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
+    #         scheduler=scheduler, verbose=True)
+    # test_data = CCM.test(Dataset_CIFAR.data_test_loader, 10)
+    # class_probs = test_data["class_probs"]
+    # class_probs = np.sum(class_probs, axis=1)
+    
+    AB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
+           Dataset_CIFAR.data_test_loader, 10, 50, optimizer, lr=0.01,
+           scheduler=scheduler, verbose=True)
+    test_data_AB = AB.test(Dataset_CIFAR.data_test_loader, 10)
+    class_probs_AB = test_data_AB["class_probs"]
+    class_probs_AB = np.sum(class_probs_AB, axis=1)
+    plt.figure()
+    plt.hist(class_probs_AB, bins=100)
+    # plt.hist(class_probs, bins=1)
+    # logging.info("class probs: {}".format(class_probs))
+    # logging.info("class probs AB: {}".format(class_probs_AB))
+    plt.savefig("./Results/CCM_ABD_Simplex.pdf")
+    logging.info("Test CCM ABD Simplex passed!")
+
+
+def test_AFE_imagenet():
+    Dataset_Imagenet = ImageNet16h(False,
+                                   data_dir="./data/osfstorage-archive/",
+                                   noise_version="110",
+                                   batch_size=32,
+                                   test_split=0.2,
+                                   val_split=0.01)
+    Dataset_Active = ActiveDataset(Dataset_Imagenet)
+
+    # Initialize method
+    classifier, meta = networks("imagenet", "AFE", device)
+    AFE_Image = AFE(classifier, meta, device)
+
+    # Fit
+    optimizer, scheduler = optimizer_scheduler()
+    length = len(Dataset_Imagenet.data_test_loader.dataset)
+    AFE_Image.fit(Dataset_Active,
+                  16, 10, lr=0.001, verbose=True,
+                  query_size=int(np.floor(length)),
+                  num_queries=1, scheduler_classifier=scheduler,
+                  scheduler_meta=scheduler, optimizer=optimizer)
+
+    plt.figure()
+    range_epochs = np.arange(0, len(AFE_Image.report))
+    accuracies = []
+
+    last_iter = len(AFE_Image.report) - 1
+    rep = AFE_Image.report[last_iter]
+    res = cov_vs_acc_AFE(rep)
+    plot_cov_vs_acc([res], ["AFE"], "Results/AFE_ImageNet_cov.pdf", std=False)
+
+    for i in range_epochs:
+        accuracies.append(AFE_Image.report[i]
+                          ["test_metrics_meta"]["system_acc"])
+    plt.plot(range_epochs, accuracies)
+    plt.savefig("Results/AFE_ImageNet_system_acc.png")
+
 
 if __name__ == "Tests.test":
     # test_indexed()
@@ -921,7 +1463,7 @@ if __name__ == "Tests.test":
     # test_Query_unnumbered()
     # test_Query_test()
     # test_iteration_report()
-    test_AFE_fit()
+    # test_AFE_fit()
     # test_OVA_loss()
     # test_BD_loss()
     # test_BD_fit_epoch()
@@ -938,4 +1480,21 @@ if __name__ == "Tests.test":
     # test_additional_defer_fit()
     # test_BCE_loss_vs_OvA()
     # test_cov_vs_acc()
+    # test_learned_beyond_loss()
+    # test_learned_beyond_fit()
+    # test_learned_additional_fit()
+    # test_beyond_fit_cifar10h()
+    # test_additional_cost()
+    # test_cost_sensitive_deferral()
+    # test_cost_sensitive_compareconf()
+    # test_cost_sensitive_OvA()
+    # test_CompConf_Meta_fit()
+    # test_cost_sensitive_CompConf_Meta()
+    # test_cifar_entropy_CCMC()
+    # test_AFE_coverage()
+    # test_set_optimization()
+    # test_all_sizes()
+    # test_hist_rej1_rej2()
+    # test_CCM_ABD_Simplex()
+    test_AFE_imagenet()
     logging.info("All tests passed!")

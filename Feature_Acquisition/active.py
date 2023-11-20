@@ -15,6 +15,7 @@ import random
 import time
 import numpy as np
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 logging.getLogger().setLevel(logging.INFO)
 
 
@@ -71,9 +72,12 @@ class ActiveDataset(BaseDataset):
                                         unlabeled_idx[pool_idx]))
         elif split == "val":
             pool_loader = self.val_loader
+            logging.info("Len val loader: {}".format(len(pool_loader.dataset)))
             pool_idx = np.arange(0, len(pool_loader.dataset))
         elif split == "test":
             pool_loader = self.test_loader
+            logging.info("Len test loader: {}".format(
+                                            len(pool_loader.dataset)))
             pool_idx = np.arange(0, len(pool_loader.dataset))
         labeled_idx = torch.where(self.mask_labeled == 1)[0]
         if (len(labeled_idx) != 0):
@@ -84,7 +88,7 @@ class ActiveDataset(BaseDataset):
 
             loss, indices = criterion(pool_loader, labeled_loader)
 
-            loss, indices_ordered = torch.sort(loss, descending=True)
+            _, indices_ordered = torch.sort(loss, descending=True)
             indices_ordered = list(indices_ordered.cpu().numpy())
             indices_query = []
             for i in indices_ordered[:query_size]:
@@ -94,14 +98,16 @@ class ActiveDataset(BaseDataset):
             indices_query = []
             for i in idx_random:
                 indices_query.append(pool_idx[i])
+            loss = torch.zeros(query_size)
+            indices_ordered = np.arange(query_size)
         if (len(indices_query) == 1):
             indices_query = torch.tensor([indices_query])
-        return indices_query
+        return indices_query, loss, indices_ordered
 
-    def Query(self, criterion, pool_size=100, batch_size=512, query_size=10,
+    def Query(self, criterion, pool_size=100, batch_size=128, query_size=10,
               ):
-        indices_query = self.indices_Query(criterion, "train", pool_size,
-                                           batch_size, query_size)
+        indices_query, _, _ = self.indices_Query(criterion, "train", pool_size,
+                                                 batch_size, query_size)
         for i in range(len(indices_query)):
             self.mask(indices_query[i])
         labeled_idx = torch.where(self.mask_labeled == 1)[0]
@@ -112,43 +118,53 @@ class ActiveDataset(BaseDataset):
 
     def Query_unnumbered(self, criterion, loss):
         len_val = len(self.val_dataset)
-        indices_query = self.indices_Query(criterion, query_size=len_val,
-                                           split="val")
+        indices_query, _, _ = self.indices_Query(criterion, query_size=len_val,
+                                                 split="val")
         loss_def = np.zeros(len_val)
         loss_no_def = np.zeros(len_val)
         for i in range(len_val):
             idx, (x, y, hum_pred) = self.val_dataset[indices_query[i]]
-            if i == 0:
-                loss_def[i] = loss(x, hum_pred, y, defer=True)
-                loss_no_def[i] = loss(x, hum_pred, y, defer=False)
-            else:
-                loss_def[i] = loss(x, hum_pred, y, defer=True)
-                loss_no_def[i] = loss(x, hum_pred, y, defer=False)
+            loss_def[i] = loss(x, y, hum_pred, defer=True)
+            loss_no_def[i] = loss(x, y, hum_pred, defer=False)
 
         loss_cum = []
         for i in range(len_val):
             loss_cum.append(np.sum(loss_def[:i])+np.sum(loss_no_def[i:]))
+        # plot loss_cum
+        plt.figure()
+        plt.plot(loss_cum)
+        plt.savefig("loss_cum.pdf")
         loss_cum = loss_cum
         min_idx = np.argmin(loss_cum)
         return min_idx, len_val
 
-    def Query_test(self, criterion, loss_criterion, size):
+    def Query_test(self, criterion, loss_criterion, size=0):
         len_test = len(self.test_dataset)
-        indices_query = self.indices_Query(criterion, query_size=len_test,
-                                           split="test")
+        indices_query, loss_testpoints, indices_ordered = \
+            self.indices_Query(criterion, query_size=len_test,
+                               split="test")
+        loss_testpoints = loss_testpoints.detach().cpu().numpy().tolist()
         loss = 0.0
         loss_defer = 0.0
         loss_no_defer = 0.0
+        loss_human = []
+        loss_class = []
+        for i in range(len(indices_ordered)):
+            idx, (x, y, hum_pred) = self.test_dataset[indices_ordered[i]]
+            assert idx == indices_ordered[i]
+            loss_human.append(loss_criterion(x, y, hum_pred, defer=True))
+            loss_class.append(loss_criterion(x, y, hum_pred, defer=False))
+
         for i in range(size):
             idx, (x, y, hum_pred) = self.test_dataset[indices_query[i]]
             assert idx == indices_query[i]
-            loss += loss_criterion(x, hum_pred, y, defer=True)
-            loss_defer += loss_criterion(x, hum_pred, y, defer=True)
+            loss += loss_criterion(x, y, hum_pred, defer=True)
+            loss_defer += loss_criterion(x, y, hum_pred, defer=True)
         for i in range(size, len_test):
             idx, (x, y, hum_pred) = self.test_dataset[indices_query[i]]
             assert idx == indices_query[i]
-            loss += loss_criterion(x, hum_pred, y, defer=False)
-            loss_no_defer += loss_criterion(x, hum_pred, y, defer=False)
+            loss += loss_criterion(x, y, hum_pred, defer=False)
+            loss_no_defer += loss_criterion(x, y, hum_pred, defer=False)
         loss = loss/len_test
         if size == 0:
             loss_defer = 0.0
@@ -158,7 +174,8 @@ class ActiveDataset(BaseDataset):
             loss_no_defer = 0.0
         else:
             loss_no_defer = loss_no_defer/(len_test-size)
-        return loss, loss_defer, loss_no_defer
+        return loss, loss_defer, loss_no_defer, loss_testpoints, loss_human, \
+            loss_class
 
 
 class AFE(BaseMethod):
@@ -180,13 +197,15 @@ class AFE(BaseMethod):
 
         data_x = x.to(self.device).unsqueeze(0)
         data_y = y.to(self.device)
-        hum_preds = m.to(self.device)
-        hum_preds = F.one_hot(hum_preds, num_classes=10)
 
         output_class = self.model_classifier(data_x)
+        num_classes = output_class.size(1)
         output_class = F.softmax(output_class, dim=1)
         _, predicted_class = torch.max(output_class.data, 1)
-
+        hum_preds = m.to(self.device)
+        hum_preds = F.one_hot(hum_preds, num_classes=num_classes)
+        if data_x.squeeze().dim() == 1 and hum_preds.dim() == 1:
+            hum_preds = hum_preds.unsqueeze(0)
         output_meta = self.model_meta(data_x, hum_preds)
         output_meta = F.softmax(output_meta, dim=1)
         _, predicted_meta = torch.max(output_meta.data, 1)
@@ -223,6 +242,8 @@ class AFE(BaseMethod):
         batch_l = -1
         with torch.no_grad():
             for iters in enumerate(dataloader_unlabeled):
+                logging.info("iter %d out of %d" % (iters[0],
+                                                    len(dataloader_unlabeled)))
                 if len(iters) == 2:
                     batch = iters[0]
                     indices, (data_x, data_y, _) = iters[1]
@@ -424,6 +445,8 @@ class AFE(BaseMethod):
                 data_test = self.test(val_loader)
                 val_metrics = compute_metalearner_metrics(data_test)
                 if val_metrics["system_acc"] >= best_acc:
+                    logging.info("Update best model. New best acc: %.3f",
+                                 val_metrics["system_acc"])
                     best_acc = val_metrics["system_acc"]
                     best_model_meta = copy.deepcopy(
                                 self.model_meta.state_dict())
@@ -478,9 +501,12 @@ class AFE(BaseMethod):
             optimizer_meta = optimizer(params_meta, lr=lr)
 
         if scheduler_classifier is not None:
-            scheduler_classifier = scheduler_classifier(optimizer_classifier)
+            scheduler_classifier = \
+                scheduler_classifier(optimizer_classifier,
+                                     len(train_loader) * epochs)
         if scheduler_meta is not None:
-            scheduler_meta = scheduler_meta(optimizer_meta)
+            scheduler_meta = scheduler_meta(optimizer_meta,
+                                            len(train_loader) * epochs)
 
         best_acc = 0
         best_model_class = copy.deepcopy(self.model_classifier.state_dict())
@@ -523,6 +549,7 @@ class AFE(BaseMethod):
             Dataset.Query(criterion, pool_size=0, query_size=query_size)
             self.model_meta.weight_init()
             Fit_Unlabeled()
+            logging.info("Fit done. Iteration %d", i)
             self.report_iteration(i, Dataset, n_classes)
 
     def report_iteration(self, query_num, Dataset, n_classes):
@@ -543,13 +570,16 @@ class AFE(BaseMethod):
                                         criterion, self.loss_defer)
         proportion = (min_idx+1)/len_val
         len_test = len(Dataset.data_test_loader.dataset)
-        logging.info("Len TEst: {}".format(len_test))
         defer_size = int(np.floor(proportion*len_test))
         report_dict["defer_size"] = defer_size
+        logging.info("Right before query test!")
         report_dict["loss_hybrid"], report_dict["loss_defer"], \
-            report_dict["loss_no_defer"] = Dataset.Query_test(criterion,
-                                                              self.loss_defer,
-                                                              defer_size)
+            report_dict["loss_no_defer"],\
+            report_dict["rej_score"],\
+            report_dict["loss_meta"],\
+            report_dict["loss_class"] = Dataset.Query_test(criterion,
+                                                           self.loss_defer,
+                                                           defer_size)
         self.report.append(report_dict)
         logging.info("query_num: %d, defer_size: %d, loss_defer: %f, \
                      loss_no_defer: %f, loss_hybrid: %f",
@@ -570,13 +600,14 @@ class AFE(BaseMethod):
                 truths_all.extend(data_y.cpu().numpy())
 
                 output_class = self.model_classifier(data_x)
+                num_classes = output_class.size(1)
                 output_class = F.softmax(output_class, dim=1)
                 _, predicted_class = torch.max(output_class.data, 1)
                 predictions_all.extend(predicted_class.cpu().numpy())
                 class_probs_all.extend(F.softmax(
                         output_class, dim=1).cpu().numpy())
 
-                hum_preds = F.one_hot(hum_preds, num_classes=10)
+                hum_preds = F.one_hot(hum_preds, num_classes=num_classes)
                 hum_preds = hum_preds.to(self.device)
                 output_meta = self.model_meta(data_x, hum_preds)
                 output_meta = F.softmax(output_meta, dim=1)

@@ -1,3 +1,4 @@
+from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add, cov_vs_acc_AFE
 from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
 from MyNet.call_net import networks, optimizer_scheduler
 from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
@@ -6,7 +7,6 @@ from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
 from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
 from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
 from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
-from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add, cov_vs_acc_AFE
 from Experiments.basic import plot_cov_vs_acc, plot_cov_vs_cost
 from MyMethod.additional_cost import AdditionalCost
 from BL.lce_cost import LceCost
@@ -429,8 +429,9 @@ def test_Query_test():
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
-    loss, _, _, _ = Dataset_CIFAR_Active.Query_test(criterion,
-                                                    AFE_CIFAR.loss_defer, 10)
+    loss, _, _, _, _, _ = Dataset_CIFAR_Active.Query_test(criterion,
+                                                          AFE_CIFAR.loss_defer,
+                                                          10)
     logging.info(loss)
     assert isinstance(loss, float)
     assert loss >= 0

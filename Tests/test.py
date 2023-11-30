@@ -430,15 +430,9 @@ def test_Query_test():
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
-<<<<<<< HEAD
     loss = Dataset_CIFAR_Active.Query_test(criterion,
                                            AFE_CIFAR.loss_defer, 10)
     loss = loss[0]
-=======
-    loss, _, _, _, _, _ = Dataset_CIFAR_Active.Query_test(criterion,
-                                                          AFE_CIFAR.loss_defer,
-                                                          10)
->>>>>>> a5f3f7776033680161fe30dd297b886239c0b78f
     logging.info(loss)
     assert isinstance(loss, float)
     assert loss >= 0

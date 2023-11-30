@@ -3,3 +3,4 @@ data/*
 *.pdf
 *.svg
 human_ai_deferral/*
+*/__pycache__/*

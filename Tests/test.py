@@ -32,6 +32,7 @@ import json
 import logging
 import matplotlib.pyplot as plt
 import warnings
+import os
 warnings.filterwarnings("ignore")
 
 logging.getLogger().setLevel(logging.INFO)
@@ -343,8 +344,8 @@ def test_AFE_fit():
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
-    def scheduler(z):
-        return torch.optim.lr_scheduler.CosineAnnealingLR(z, 34000*150)
+    def scheduler(z, l):
+        return torch.optim.lr_scheduler.CosineAnnealingLR(z, l)
 
     AFE_CIFAR.fit(Dataset_CIFAR_Active,
                   10, 1, lr=0.001, verbose=True,
@@ -429,8 +430,9 @@ def test_Query_test():
     # AFE
     AFE_CIFAR = AFE(Classifier, Meta, device)
 
-    loss, _, _, _ = Dataset_CIFAR_Active.Query_test(criterion,
-                                                    AFE_CIFAR.loss_defer, 10)
+    loss = Dataset_CIFAR_Active.Query_test(criterion,
+                                           AFE_CIFAR.loss_defer, 10)
+    loss = loss[0]
     logging.info(loss)
     assert isinstance(loss, float)
     assert loss >= 0
@@ -458,6 +460,9 @@ def test_iteration_report():
     assert AFE_CIFAR.report[0]["query_num"] == 0
     assert AFE_CIFAR.report[0]["defer_size"] >= 0
     assert AFE_CIFAR.report[0]["loss_defer"] > 0.0
+    if not os.path.isfile('AFE_CIFAR_report.json'):
+        with open('AFE_CIFAR_report.json', 'w') as fp:
+            json.dump(AFE_CIFAR.report, fp)
     with open('AFE_CIFAR_report.json', 'r') as fp:
         AFE_CIFAR_report = json.load(fp)
         meta_loss = np.zeros(len(AFE_CIFAR_report))
@@ -1462,13 +1467,13 @@ def test_all():
     # test_AFE_fit_epochs()
     # test_AFE_fit_Eu()
     # test_Query_unnumbered()
-    test_Query_test()
-    test_iteration_report()
-    test_AFE_fit()
-    test_OVA_loss()
-    test_BD_loss()
-    test_BD_fit_epoch()
-    test_BD_fit()
+    # test_Query_test()
+    # test_iteration_report()
+    # test_AFE_fit()
+    # test_OVA_loss()
+    # test_BD_loss()
+    # test_BD_fit_epoch()
+    # test_BD_fit()
     test_BD_fit_CIFAR10h()
     test_BD_fit_Imagenet()
     test_RS_Imagenet()

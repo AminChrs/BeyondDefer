@@ -53,7 +53,7 @@ def CIFAR10K_init():
     methods = ["Additional Beyond Defer",
                "Learned Additional Beyond", "Compare Confidences Additional",
                "Reallizable Surrogate", "Compare Confindences",
-               "One-versus-All", "Cross Entropy"]
+               "One-versus-All", "Cross Entropy", "Asymmetric Softmax"]
     res = []
     return return_res(k_range=k_range, methods=methods, res=res)
 

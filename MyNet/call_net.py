@@ -65,6 +65,60 @@ def model_imagenet(n, device):
 
 
 def networks(dataset_name, method, device):
+    # Here I have two cifar_synth due to the reviewer asking a different
+    # network. Make sure that you remove one of them later.
+    # The first is with WideResNet.
+    if dataset_name == "cifar_synth":
+        if method == "BD":
+            model_classifier = WideResNet(28, 10, 4, dropRate=0).to(device)
+            model_human = WideResNet(28, 10, 4, dropRate=0).to(device)
+            model_meta = MetaNet(10, WideResNet(28, 10, 4, dropRate=0),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_human, model_meta
+        if method == "Additional":
+            model_classifier = WideResNet(28, 11, 4, dropRate=0).to(device)
+            model_human = WideResNet(28, 10, 4, dropRate=0).to(device)
+            model_meta = MetaNet(10, WideResNet(28, 10, 4, dropRate=0),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_human, model_meta
+        if method == "LearnedBeyond":
+            model_classifier = WideResNet(28, 11, 4, dropRate=0).to(device)
+            model_meta = MetaNet(10, WideResNet(28, 10, 4, dropRate=0),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_meta
+        if method == "LearnedAdditional":
+            model_classifier = WideResNet(28, 12, 4, dropRate=0).to(device)
+            model_meta = MetaNet(10, WideResNet(28, 10, 4, dropRate=0),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_meta
+        if method == "CompConfMeta":
+            model_classifier = WideResNet(28, 10, 4, dropRate=0).to(device)
+            model_meta = MetaNet(10, WideResNet(28, 10, 4, dropRate=0),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            model_defer = WideResNet(28, 2, 4, dropRate=0).to(device)
+            model_defer_meta = WideResNet(28, 2, 4, dropRate=0).to(device)
+            return model_classifier, model_meta, model_defer, model_defer_meta
+        elif method == "AFE":
+            model_classifier = WideResNet(28, 10, 4, dropRate=0).to(device)
+            model_meta = MetaNet(10, WideResNet(28, 10, 4, dropRate=0),
+                                 [1, 20, 1],
+                                 remove_layers=["fc3", "softmax"]).to(device)
+            return model_classifier, model_meta
+        elif method == "triage" or method == "confidence":
+            model_class = WideResNet(28, 10, 4, dropRate=0).to(device)
+            model_expert = WideResNet(28, 2, 4, dropRate=0).to(device)
+            return model_class, model_expert
+        elif method == "selective":
+            model = WideResNet(28, 10, 4, dropRate=0).to(device)
+            return model
+        else:
+            model = WideResNet(28, 11, 4, dropRate=0).to(device)
+            return model
     if dataset_name == "cifar_synth":
         if method == "BD":
             model_classifier = NetSimple(10, 50, 50, 100, 20).to(device)

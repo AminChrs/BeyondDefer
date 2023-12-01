@@ -30,6 +30,4 @@ jobs:
     - name: Test with pytest
       run: |
         export PYTHONPATH=$PWD
-        echo $PYTHONPATH
-        ls -l
         pytest -v -s test_all.py

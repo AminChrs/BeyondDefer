@@ -31,7 +31,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest
         pip install -r requirements.txt
+    # creation of data directory should be done using the code not here
     - name: Test with pytest
       run: |
+        mkdir data 
         export PYTHONPATH=$PWD
         pytest -v -s test_all.py

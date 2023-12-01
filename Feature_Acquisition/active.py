@@ -3,7 +3,7 @@
 # Afterwards, I update my belief about the human label and re-train the model
 import logging
 import sys
-logging.warning("sys path: {}".format(sys.path))
+print("sys path: ", sys.path)
 import copy
 import torch
 from human_ai_defer.datasetsdefer.basedataset import BaseDataset

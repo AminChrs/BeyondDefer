@@ -29,4 +29,5 @@ jobs:
         pip install -r requirements.txt
     - name: Test with pytest
       run: |
-        PYTHONPATH=. pytest -v -s test_all.py
+        export PYTHONPATH=$PWD
+        pytest -v -s test_all.py

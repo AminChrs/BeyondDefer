@@ -602,7 +602,7 @@ def test_BD_fit_CIFAR10h():
     dataset = Cifar10h(False, data_dir='./data')
 
     # models
-    classifier, human, meta = networks("cifar_10h", "BD", device)
+    classifier, human, meta = networks("cifar_10h", "BD", device, sp_epochs=1)
 
     # BD
     BD = BeyondDefer(10, classifier, human, meta, device)
@@ -1002,7 +1002,7 @@ def test_beyond_fit_cifar10h():
     Dataset_CIFAR = Cifar10h(False, data_dir='./data')
 
     # Initialize method
-    classifier, human, meta = networks("cifar_10h", "BD", device)
+    classifier, human, meta = networks("cifar_10h", "BD", device, sp_epochs=1)
 
     B = BeyondDefer(10, classifier, human, meta, device)
 
@@ -1356,7 +1356,7 @@ def test_hist_rej1_rej2():
 
     # Initialize method
     classifier, meta, defer, defer_meta = \
-        networks("cifar_10h", "CompConfMeta", device)
+        networks("cifar_10h", "CompConfMeta", device, sp_epochs=1)
     CCM = CompareConfMeta(10, classifier, meta, defer, defer_meta, device)
 
     # Fit
@@ -1383,11 +1383,11 @@ def test_CCM_ABD_Simplex():
 
     # Initialize method
     classifier, meta, defer, defer_meta = \
-        networks("cifar_10h", "CompConfMeta", device)
+        networks("cifar_10h", "CompConfMeta", device, sp_epochs=1)
     CompareConfMeta(10, classifier, meta, defer, defer_meta, device)
 
     classifier_AB, human_AB, meta_AB = \
-        networks("cifar_10h", "Additional", device)
+        networks("cifar_10h", "Additional", device, sp_epochs=1)
     AB = AdditionalBeyond(10, classifier_AB, human_AB, meta_AB, device)
 
     # Fit

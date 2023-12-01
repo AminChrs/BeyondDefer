@@ -33,7 +33,7 @@ def load_model_trained_cifarh(n, device, path):
     return model
 
 
-def model_cifarh(n, device, path):
+def model_cifarh(n, device, path, sp_epochs=200):
     if os.path.exists(path):
         model = load_model_trained_cifarh(n, device, path)
     else:
@@ -45,7 +45,7 @@ def model_cifarh(n, device, path):
             dataset.data_train_loader,
             dataset.data_val_loader,
             dataset.data_test_loader,
-            epochs=200,
+            epochs=sp_epochs,
             optimizer=optimizer,
             lr=0.001,
             verbose=True,
@@ -64,7 +64,7 @@ def model_imagenet(n, device):
     return model_linear
 
 
-def networks(dataset_name, method, device):
+def networks(dataset_name, method, device, **kwargs):
     # Here I have two cifar_synth due to the reviewer asking a different
     # network. Make sure that you remove one of them later.
     # The first is with WideResNet.
@@ -171,74 +171,98 @@ def networks(dataset_name, method, device):
             model = NetSimple(11, 50, 50, 100, 20).to(device)
             return model
     elif dataset_name == "cifar_10h":
+        if 'sp_epochs' in kwargs.keys():
+            sp_epochs = kwargs['sp_epochs']
+        else:
+            sp_epochs = 200
         if method == "BD":
             model_classifier = model_cifarh(10, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_human = model_cifarh(10, device,
-                                       "./models/cifar10h.pt")
+                                       "./models/cifar10h.pt",
+                                       sp_epochs)
             model_meta = MetaNet(10, model_cifarh(10, device,
-                                                  "./models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt",
+                                                  sp_epochs),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
         if method == "Additional":
             model_classifier = model_cifarh(11, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_human = model_cifarh(10, device,
-                                       "./models/cifar10h.pt")
+                                       "./models/cifar10h.pt",
+                                       sp_epochs)
             model_meta = MetaNet(10, model_cifarh(10, device,
-                                                  "./models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt",
+                                                  sp_epochs),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_human, model_meta
         if method == "LearnedBeyond":
             model_classifier = model_cifarh(11, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_meta = MetaNet(10, model_cifarh(10, device,
-                                                  "./models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt",
+                                                  sp_epochs),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_meta
         if method == "LearnedAdditional":
             model_classifier = model_cifarh(12, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_meta = MetaNet(10, model_cifarh(10, device,
-                                                  "./models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt",
+                                                  sp_epochs),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             return model_classifier, model_meta
         if method == "CompConfMeta":
             model_classifier = model_cifarh(10, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_meta = MetaNet(10, model_cifarh(10, device,
-                                                  "./models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt",
+                                                  sp_epochs),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             model_defer = model_cifarh(2, device,
-                                       "./models/cifar10h.pt")
+                                       "./models/cifar10h.pt",
+                                       sp_epochs)
             model_defer_meta = model_cifarh(2, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             return model_classifier, model_meta, model_defer, model_defer_meta
         elif method == "AFE":
             model_classifier = model_cifarh(10, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_meta = MetaNet(10, model_cifarh(10, device, 
-                                                  "./models/cifar10h.pt"),
+                                                  "./models/cifar10h.pt",
+                                                  sp_epochs),
                                  [1, 50, 1],
                                  remove_layers=["fc2", "softmax"]).to(device)
             logging.info("AFE model assigned!")
             return model_classifier, model_meta
         elif method == "triage" or method == "confidence":
             model_classifier = model_cifarh(10, device,
-                                            "./models/cifar10h.pt")
+                                            "./models/cifar10h.pt",
+                                            sp_epochs)
             model_expert = model_cifarh(2, device,
-                                        "./models/cifar10h.pt")
+                                        "./models/cifar10h.pt",
+                                        sp_epochs)
             return model_classifier, model_expert
         elif method == "selective":
-            model = model_cifarh(10, device, "./models/cifar10h.pt")
+            model = model_cifarh(10, device, "./models/cifar10h.pt",
+                                 sp_epochs)
             return model
         else:
-            model = model_cifarh(11, device, "./models/cifar10h.pt")
+            model = model_cifarh(11, device, "./models/cifar10h.pt",
+                                 sp_epochs)
             return model
     elif dataset_name == "imagenet":
         if method == "BD":

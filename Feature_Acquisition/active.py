@@ -1,6 +1,8 @@
 # In this file, I am finding a thresholding over the D(P(Y|X), P(Y|X, M))
 # Based on which I decide whether to collect the human feature or not
 # Afterwards, I update my belief about the human label and re-train the model
+import sys
+logging.warning("sys path: {}".format(sys.path))
 import copy
 import torch
 from human_ai_defer.datasetsdefer.basedataset import BaseDataset
@@ -17,7 +19,6 @@ import numpy as np
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 logging.getLogger().setLevel(logging.INFO)
-
 
 class IndexedDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, split="train"):

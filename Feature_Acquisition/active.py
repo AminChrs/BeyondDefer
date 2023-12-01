@@ -1,6 +1,7 @@
 # In this file, I am finding a thresholding over the D(P(Y|X), P(Y|X, M))
 # Based on which I decide whether to collect the human feature or not
 # Afterwards, I update my belief about the human label and re-train the model
+import logging
 import sys
 logging.warning("sys path: {}".format(sys.path))
 import copy
@@ -10,7 +11,6 @@ from human_ai_defer.baselines.basemethod import BaseMethod
 from human_ai_defer.helpers.utils import AverageMeter, accuracy
 from metrics.metrics import compute_metalearner_metrics
 from human_ai_defer.helpers.metrics import compute_classification_metrics
-import logging
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import random

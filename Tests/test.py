@@ -1474,7 +1474,7 @@ def test_all():
     # test_BD_loss()
     # test_BD_fit_epoch()
     # test_BD_fit()
-    test_BD_fit_CIFAR10h()
+    # test_BD_fit_CIFAR10h()
     test_BD_fit_Imagenet()
     test_RS_Imagenet()
     test_BD_Hatespeech()

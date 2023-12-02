@@ -48,3 +48,4 @@ tzdata==2023.3
 urllib3==2.1.0
 webcolors==1.13
 zipp==3.17.0
+osfclient==0.0.5

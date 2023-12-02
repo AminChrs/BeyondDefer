@@ -37,6 +37,5 @@ jobs:
       run: |
         mkdir data
         mkdir models
-        mkdir Results
         export PYTHONPATH=$PWD/src 
         pytest -v -s --log-cli-level=info test_all.py

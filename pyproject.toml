@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "beyonddefer"
-version = "1.0.0"
+version = "1.1.0"
 description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -15,7 +15,7 @@ requires-python = ">=3.8"
 Homepage = "https://github.com/AminChrs/BeyondDefer"
 
 [tool.bumpver]
-current_version = "1.0.0"
+current_version = "1.1.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "Bump version {old_version} -> {new_version}"
 commit          = true
@@ -31,5 +31,5 @@ push            = false
     "{version}",
     "{pep440_version}",
 ]
-"src/beyonddefer/__init__.py" = ["{version}"]
+"src/beyonddefer/__init__.py" = ['__version__ = "{version}"']
 

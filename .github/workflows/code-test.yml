@@ -31,8 +31,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest
         pip install -r requirements.txt
-        osf -p 2ntrf clone ./data/
-        mv ./data/osfstorage ./data/osfstorage-archive
     # Note: creation of data and models directory should be done using the code not here
     - name: Test with pytest
       run: |

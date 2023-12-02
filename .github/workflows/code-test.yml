@@ -36,5 +36,6 @@ jobs:
       run: |
         mkdir data
         mkdir models
-        export PYTHONPATH=$PWD
+        mkdir Results
+        export PYTHONPATH=$PWD/src 
         pytest -v -s test_all.py

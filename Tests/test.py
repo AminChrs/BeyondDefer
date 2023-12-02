@@ -611,7 +611,7 @@ def test_BD_fit_CIFAR10h():
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
            dataset.data_test_loader, 10, 1, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)  # 80
-    plot_cov_vs_acc(BD.test(dataset.data_test_loader, 10))
+    # plot_cov_vs_acc(BD.test(dataset.data_test_loader, 10))
     print("Test BD on CIFAR-10H fit passed!")
 
 
@@ -635,7 +635,7 @@ def test_BD_fit_Imagenet():
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
            dataset.data_test_loader, 16, 1, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)  # 80
-    plot_cov_vs_acc(BD.test(dataset.data_test_loader, 16))
+    # plot_cov_vs_acc(BD.test(dataset.data_test_loader, 16))
     print("Test BD on Imagenet fit passed!")
 
 
@@ -682,7 +682,7 @@ def test_BD_Hatespeech():
     BD.fit(dataset.data_train_loader, dataset.data_val_loader,
            dataset.data_test_loader, 3, 1, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)  # 200
-    plot_cov_vs_acc(BD.test(dataset.data_test_loader, 4))
+    # plot_cov_vs_acc(BD.test(dataset.data_test_loader, 4))
     print("Test BD on HateSpeech fit passed!")
 
 
@@ -855,7 +855,7 @@ def test_additional_defer_fit():
            Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)  # 80
     test_data = AB.test(Dataset_CIFAR.data_test_loader, 10)
-    plot_cov_vs_acc(test_data)
+    # plot_cov_vs_acc(test_data)
     print("Test Additional fit passed!")
 
 

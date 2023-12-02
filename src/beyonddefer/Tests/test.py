@@ -1,30 +1,36 @@
-from metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add, cov_vs_acc_AFE
-from Feature_Acquisition.active import IndexedDataset, ActiveDataset, AFE
-from MyNet.call_net import networks, optimizer_scheduler
-from human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
-from human_ai_defer.datasetsdefer.hatespeech import HateSpeech
-from human_ai_defer.datasetsdefer.cifar_h import Cifar10h
-from human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
-from human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
-from human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
-from Experiments.basic import plot_cov_vs_acc, plot_cov_vs_cost
-from MyMethod.additional_cost import AdditionalCost
-from BL.lce_cost import LceCost
-from BL.compare_confidence_cost import CompareConfCost
-from BL.one_v_all_cost import OVACost
-from MyMethod.CompareConfMeta import CompareConfMeta
-from MyMethod.CompareConfMetaCost import CompareConfMetaCost
-from MyNet.networks import MetaNet
-from MyMethod.beyond_defer import BeyondDefer
-from MyMethod.additional_defer import AdditionalBeyond
-from human_ai_defer.networks.cnn import NetSimple
-from MyMethod.learned_beyond import LearnedBeyond
-from MyMethod.learned_additional import LearnedAdditional
-from Datasets.cifar import CifarSynthDatasetEnt
-# from Experiments.comparison import Exp_lb_parallel
-from Experiments.comparison import SetFunction
-# from metrics.metrics import plot_cov_vs_acc
-from Experiments.basic_parallel import experiment_parallel, return_res
+from beyonddefer.metrics.metrics import cov_vs_acc_meta, cov_vs_acc_add, \
+    cov_vs_acc_AFE
+from beyonddefer.Feature_Acquisition.active import IndexedDataset, \
+    ActiveDataset, AFE
+from beyonddefer.MyNet.call_net import networks, optimizer_scheduler
+from beyonddefer.human_ai_defer.datasetsdefer.cifar_synth import \
+    CifarSynthDataset
+from beyonddefer.human_ai_defer.datasetsdefer.hatespeech import HateSpeech
+from beyonddefer.human_ai_defer.datasetsdefer.cifar_h import Cifar10h
+from beyonddefer.human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
+from beyonddefer.human_ai_defer.methods.realizable_surrogate import \
+    RealizableSurrogate
+from beyonddefer.human_ai_defer.helpers.metrics import \
+    compute_coverage_v_acc_curve
+from beyonddefer.Experiments.basic import plot_cov_vs_acc, plot_cov_vs_cost
+from beyonddefer.MyMethod.additional_cost import AdditionalCost
+from beyonddefer.BL.lce_cost import LceCost
+from beyonddefer.BL.compare_confidence_cost import CompareConfCost
+from beyonddefer.BL.one_v_all_cost import OVACost
+from beyonddefer.MyMethod.CompareConfMeta import CompareConfMeta
+from beyonddefer.MyMethod.CompareConfMetaCost import CompareConfMetaCost
+from beyonddefer.MyNet.networks import MetaNet
+from beyonddefer.MyMethod.beyond_defer import BeyondDefer
+from beyonddefer.MyMethod.additional_defer import AdditionalBeyond
+from beyonddefer.human_ai_defer.networks.cnn import NetSimple
+from beyonddefer.MyMethod.learned_beyond import LearnedBeyond
+from beyonddefer.MyMethod.learned_additional import LearnedAdditional
+from beyonddefer.Datasets.cifar import CifarSynthDatasetEnt
+# from beyonddefer.Experiments.comparison import Exp_lb_parallel
+from beyonddefer.Experiments.comparison import SetFunction
+# from beyonddefer.metrics.metrics import plot_cov_vs_acc
+from beyonddefer.Experiments.basic_parallel import experiment_parallel, \
+    return_res
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -854,7 +860,6 @@ def test_additional_defer_fit():
     AB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
            Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.001,
            scheduler=scheduler, verbose=True)  # 80
-    test_data = AB.test(Dataset_CIFAR.data_test_loader, 10)
     # plot_cov_vs_acc(test_data)
     print("Test Additional fit passed!")
 
@@ -1402,7 +1407,7 @@ def test_CCM_ABD_Simplex():
     # test_data = CCM.test(Dataset_CIFAR.data_test_loader, 10)
     # class_probs = test_data["class_probs"]
     # class_probs = np.sum(class_probs, axis=1)
-    
+
     AB.fit(Dataset_CIFAR.data_train_loader, Dataset_CIFAR.data_val_loader,
            Dataset_CIFAR.data_test_loader, 10, 1, optimizer, lr=0.01,
            scheduler=scheduler, verbose=True)  # 50

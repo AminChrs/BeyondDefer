@@ -1,0 +1,15 @@
+# pyproject.toml
+
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beyonddefer"
+version = "1.0.0"
+description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/AminChrs/BeyondDefer"

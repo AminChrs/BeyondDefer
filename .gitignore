@@ -1,4 +1,5 @@
 data/*
+models/*
 .DS_Store
 *.pdf
 *.svg

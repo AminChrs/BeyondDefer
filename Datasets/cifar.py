@@ -1,6 +1,6 @@
 import torch
-from human_ai_deferral.datasetsdefer.basedataset import BaseDataset
-from human_ai_deferral.datasetsdefer.generic_dataset import\
+from human_ai_defer.datasetsdefer.basedataset import BaseDataset
+from human_ai_defer.datasetsdefer.generic_dataset import\
      GenericImageExpertDataset
 import numpy as np
 import random

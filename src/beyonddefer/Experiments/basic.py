@@ -1,23 +1,26 @@
 from beyonddefer.Feature_Acquisition.active import ActiveDataset, AFE
-# from MyMethod.beyond_defer import BeyondDefer
+# from beyonddefer.MyMethod.beyond_defer import BeyondDefer
 from beyonddefer.MyMethod.additional_defer import AdditionalBeyond
-# from MyMethod.learned_beyond import LearnedBeyond
+# from beyonddefer.MyMethod.learned_beyond import LearnedBeyond
 from beyonddefer.MyMethod.learned_additional import LearnedAdditional
 from beyonddefer.MyMethod.CompareConfMeta import CompareConfMeta
-from beyonddefer.human_ai_defer.methods.realizable_surrogate import RealizableSurrogate
-from beyonddefer.human_ai_defer.baselines.compare_confidence import CompareConfidence
+from beyonddefer.human_ai_defer.methods.realizable_surrogate import \
+    RealizableSurrogate
+from beyonddefer.human_ai_defer.baselines.compare_confidence import \
+    CompareConfidence
 from beyonddefer.human_ai_defer.baselines.lce_surrogate import LceSurrogate
 from beyonddefer.human_ai_defer.baselines.one_v_all import OVASurrogate
-from beyonddefer.human_ai_defer.helpers.metrics import compute_coverage_v_acc_curve
+from beyonddefer.human_ai_defer.helpers.metrics import \
+    compute_coverage_v_acc_curve
 import os
 # from metrics.metrics import cov_vs_acc_meta
 from tikzplotlib import save as tikz_save
-from metrics.metrics import cov_vs_acc_add, cov_vs_acc_AFE
+from beyonddefer.metrics.metrics import cov_vs_acc_add, cov_vs_acc_AFE
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-from MyNet.call_net import networks, optimizer_scheduler
+from beyonddefer.MyNet.call_net import networks, optimizer_scheduler
 import warnings
 import logging
 warnings.filterwarnings("ignore")

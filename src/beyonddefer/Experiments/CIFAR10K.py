@@ -1,6 +1,8 @@
 from beyonddefer.Experiments.basic import general_experiment
-from beyonddefer.human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
-from beyonddefer.Experiments.basic_parallel import experiment_parallel, return_res
+from beyonddefer.human_ai_defer.datasetsdefer.cifar_synth import \
+    CifarSynthDataset
+from beyonddefer.Experiments.basic_parallel import experiment_parallel, \
+    return_res
 import numpy as np
 import matplotlib.pyplot as plt
 import os

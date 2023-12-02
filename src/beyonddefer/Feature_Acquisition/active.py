@@ -8,7 +8,8 @@ from beyonddefer.human_ai_defer.datasetsdefer.basedataset import BaseDataset
 from beyonddefer.human_ai_defer.baselines.basemethod import BaseMethod
 from beyonddefer.human_ai_defer.helpers.utils import AverageMeter, accuracy
 from beyonddefer.metrics.metrics import compute_metalearner_metrics
-from beyonddefer.human_ai_defer.helpers.metrics import compute_classification_metrics
+from beyonddefer.human_ai_defer.helpers.metrics import \
+    compute_classification_metrics
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import random

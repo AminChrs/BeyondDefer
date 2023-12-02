@@ -1,9 +1,11 @@
-from beyonddefer.human_ai_defer.datasetsdefer.cifar_synth import CifarSynthDataset
+from beyonddefer.human_ai_defer.datasetsdefer.cifar_synth import \
+    CifarSynthDataset
 from beyonddefer.human_ai_defer.datasetsdefer.hatespeech import HateSpeech
 from beyonddefer.human_ai_defer.datasetsdefer.imagenet_16h import ImageNet16h
 from beyonddefer.human_ai_defer.datasetsdefer.cifar_h import Cifar10h
 from beyonddefer.Experiments.basic import general_experiment, plot_cov_vs_acc
-from beyonddefer.Experiments.basic_parallel import experiment_parallel, return_res
+from beyonddefer.Experiments.basic_parallel import experiment_parallel, \
+    return_res
 from beyonddefer.metrics.metrics import aggregate_plots
 import warnings
 import numpy as np

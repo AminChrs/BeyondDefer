@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from beyonddefer.MyNet.call_net import networks, optimizer_scheduler
 from beyonddefer.MyMethod.CompareConfMeta import CompareConfMeta
 from beyonddefer.Datasets.cifar import CifarSynthDatasetEnt
-from beyonddefer.Experiments.basic_parallel import return_res, experiment_parallel
+from beyonddefer.Experiments.basic_parallel import return_res, \
+    experiment_parallel
 import logging
 import warnings
 import itertools

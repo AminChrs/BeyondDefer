@@ -1,37 +1,28 @@
-# pyproject.toml
+[tool.poetry]
+name = "beyonddefer"
+version = "1.0.2"
+description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
+authors = ["BeyondDefer Authors"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+matplotlib = "^3.7.4"
+numpy = "^1.24.4"
+osfclient = "^0.0.5"
+pandas = "^2.0.3"
+Pillow = "^10.1.0"
+requests = "^2.31.0"
+scikit-learn = "^1.3.2"
+scipy = "^1.10.1"
+tikzplotlib = "^0.10.1"
+torch = "^2.1.1"
+torchtext = "^0.16.1"
+torchvision = "^0.16.1"
+tqdm = "^4.66.1"
+sentence-transformers = "^2.2.2"
+
 
 [build-system]
-requires      = ["setuptools>=61.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "beyonddefer"
-version = "1.0.1"
-description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
-readme = "README.md"
-dependencies = [
-    "gurobipy",
-    "matplotlib",
-    "numpy",
-    "osfclient",
-    "pandas",
-    "Pillow",
-    "Requests",
-    "scikit_learn",
-    "scipy",
-    "sentence_transformers",
-    "tikzplotlib",
-    "torch>=2.1.1",
-    "torchtext",
-    "torchvision",
-    "tqdm",
-]
-requires-python = ">=3.8"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["beyonddefer*"] 
-namespaces = false
-
-[project.urls]
-Homepage = "https://github.com/AminChrs/BeyondDefer"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

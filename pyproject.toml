@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "beyonddefer"
-version = "1.2.2"
+version = "1.0.1"
 description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
 readme = "README.md"
 dependencies = [
@@ -27,6 +27,11 @@ dependencies = [
     "tqdm",
 ]
 requires-python = ">=3.8"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["beyonddefer*"] 
+namespaces = false
 
 [project.urls]
 Homepage = "https://github.com/AminChrs/BeyondDefer"

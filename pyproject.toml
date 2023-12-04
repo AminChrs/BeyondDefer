@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "beyonddefer"
-version = "1.0.3"
+version = "1.0.4"
 description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
 authors = ["BeyondDefer Authors"]
 readme = "README.md"

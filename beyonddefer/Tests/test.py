@@ -64,7 +64,7 @@ def test_indexed():
         assert index == i
 
     if Test_Text:
-        data_dir = './human_ai_defer/data/'
+        data_dir = './data/'
         Dataset_Hate = HateSpeech(data_dir, True, False, 'random_annotator',
                                   device)
         Dataset_Hate_indexed = IndexedDataset(Dataset_Hate)
@@ -93,7 +93,7 @@ def test_active_mask():
 
     # Text
     if Test_Text:
-        data_dir = './human_ai_defer/data/'
+        data_dir = './data/'
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         Dataset_Hate = HateSpeech(data_dir, True, False, 'random_annotator',
                                   device)

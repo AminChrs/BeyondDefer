@@ -138,7 +138,7 @@ class Cifar10h(BaseDataset):
         kwargs = {"num_workers": 0, "pin_memory": True}
 
         train_dataset_all = datasets.__dict__[dataset.upper()](
-            "../data", train=False, download=True, transform=transform_test
+            "./data", train=False, download=True, transform=transform_test
         )
         labels_all = train_dataset_all.targets
         self.metrics_cifar10h(human_predictions, labels_all)

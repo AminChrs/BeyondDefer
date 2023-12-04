@@ -109,7 +109,7 @@ class CifarSynthDatasetEnt(BaseDataset):
             dataset = "cifar100"
 
         train_dataset_all = datasets.__dict__[dataset.upper()](
-            "../data", train=True, download=True, transform=transform_train
+            "./data", train=True, download=True, transform=transform_train
         )
         train_size = int((1 - self.val_split) * len(train_dataset_all))
         val_size = len(train_dataset_all) - train_size
@@ -119,7 +119,7 @@ class CifarSynthDatasetEnt(BaseDataset):
         )
 
         test_dataset = datasets.__dict__["cifar10".upper()](
-            "../data", train=False, transform=transform_test, download=True
+            "./data", train=False, transform=transform_test, download=True
         )
 
         dataset_train = GenericImageExpertDataset(

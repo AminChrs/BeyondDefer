@@ -4,4 +4,4 @@ models/*
 *.pdf
 *.svg
 human_ai_deferral/*
-*/__pycache__/*
+**/__pycache__/*

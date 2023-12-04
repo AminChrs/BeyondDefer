@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "beyonddefer"
-version = "1.0.2"
+version = "1.0.3"
 description = "The code for paper 'Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions'"
 authors = ["BeyondDefer Authors"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<=3.10"
 matplotlib = "^3.7.4"
 numpy = "^1.24.4"
 osfclient = "^0.0.5"

@@ -1,3 +1,3 @@
 [submodule "human_ai_defer"]
-	path = src/beyonddefer/human_ai_defer
+	path = beyonddefer/human_ai_defer
 	url = https://github.com/AminChrs/human_ai_deferral

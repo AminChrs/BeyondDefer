@@ -1356,7 +1356,7 @@ def test_all_sizes():
         logging.info("Test: {}".format(test_num))
 
     logging.info("Test all sizes passed!")
-    
+
 
 def test_all_sizes_no_imagenet():
 

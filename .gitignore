@@ -1,3 +1,4 @@
+dist/*
 data/*
 models/*
 .DS_Store

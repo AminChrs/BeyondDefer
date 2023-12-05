@@ -1356,6 +1356,35 @@ def test_all_sizes():
         logging.info("Test: {}".format(test_num))
 
     logging.info("Test all sizes passed!")
+    
+
+def test_all_sizes_no_imagenet():
+
+    # CIFAR-10K
+    Dataset_CIFAR = CifarSynthDataset(10, False, batch_size=512)
+
+    # CIFAR-10H
+    Dataset_CIFAR_H = Cifar10h(False, data_dir='./data')
+
+    # Hate speech
+    Dataset_hate = HateSpeech("./data/", True, False, 'random_annotator',
+                              device)
+
+    all_datasets = [Dataset_CIFAR, Dataset_CIFAR_H,
+                    Dataset_hate]
+
+    name_datasets = ["CIFAR-10K", "CIFAR-10H", "Hate Speech"]
+
+    for i, dataset in enumerate(all_datasets):
+        train_num = len(dataset.data_train_loader.dataset)
+        val_num = len(dataset.data_val_loader.dataset)
+        test_num = len(dataset.data_test_loader.dataset)
+        logging.info("Dataset: {}".format(name_datasets[i]))
+        logging.info("Train: {}".format(train_num))
+        logging.info("Val: {}".format(val_num))
+        logging.info("Test: {}".format(test_num))
+
+    logging.info("Test all sizes (except imagenet) passed!")
 
 
 def test_hist_rej1_rej2():
@@ -1464,9 +1493,9 @@ def test_AFE_imagenet():
 
 
 def test_all():
-    args = Namespace(project='2ntrf', output='data/', update=False, username=None)
-    osfclient.cli.clone(args)
-    os.rename("data/osftorage", "data/osfstorage-archive")
+    # args = Namespace(project='2ntrf', output='data/', update=False, username=None)
+    # osfclient.cli.clone(args)
+    # os.rename("data/osftorage", "data/osfstorage-archive")
     # test_indexed()
     # test_active_mask()
     # test_active_query()
@@ -1484,33 +1513,34 @@ def test_all():
     # test_BD_loss()
     # test_BD_fit_epoch()
     # test_BD_fit()
-    # test_BD_fit_CIFAR10h()
+    test_BD_fit_CIFAR10h()
     # test_BD_fit_Imagenet()
     # test_RS_Imagenet()
-    # test_BD_Hatespeech()
-    # test_RS_Hatespeech()
-    # test_parallel()
-    # test_return_res()
-    # test_compute_meta()
-    # test_additional_defer_loss()
-    # test_additional_defer_fit()
-    # test_BCE_loss_vs_OvA()
-    # test_cov_vs_acc()
-    # test_learned_beyond_loss()
-    # test_learned_beyond_fit()
-    # test_learned_additional_fit()
-    # test_beyond_fit_cifar10h()
-    # test_additional_cost()
-    # test_cost_sensitive_deferral()
-    # test_cost_sensitive_compareconf()
-    # test_cost_sensitive_OvA()
-    # test_CompConf_Meta_fit()
-    # test_cost_sensitive_CompConf_Meta()
-    # test_cifar_entropy_CCMC()
+    test_BD_Hatespeech()
+    test_RS_Hatespeech()
+    test_parallel()
+    test_return_res()
+    test_compute_meta()
+    test_additional_defer_loss()
+    test_additional_defer_fit()
+    test_BCE_loss_vs_OvA()
+    test_cov_vs_acc()
+    test_learned_beyond_loss()
+    test_learned_beyond_fit()
+    test_learned_additional_fit()
+    test_beyond_fit_cifar10h()
+    test_additional_cost()
+    test_cost_sensitive_deferral()
+    test_cost_sensitive_compareconf()
+    test_cost_sensitive_OvA()
+    test_CompConf_Meta_fit()
+    test_cost_sensitive_CompConf_Meta()
+    test_cifar_entropy_CCMC()
     # test_AFE_coverage()
-    # test_set_optimization()
+    test_set_optimization()
     # test_all_sizes()
-    # test_hist_rej1_rej2()
-    # test_CCM_ABD_Simplex()
+    test_all_sizes_no_imagenet()
+    test_hist_rej1_rej2()
+    test_CCM_ABD_Simplex()
     # test_AFE_imagenet()
     logging.info("All tests passed!")

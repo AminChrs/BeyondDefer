@@ -1,6 +1,8 @@
-# Quick Start
+# Overview
 
 In this package, we provide the code to reproduce the experiments in the paper "Is Learn to Defer Enough? Optimal Predictors that Incorporate Human Decisions". 
+
+**Note:** The contents of the directory `beyonddefer/human_ai_defer`, that provides the implementation of baselines and data generation, are a modified version of the code presented in [this repository](https://github.com/clinicalml/human_ai_deferral), which contains the associated code for the paper [Who Should Predict? Exact Algorithms For Learning to Defer to Humans](https://arxiv.org/abs/2301.06197), published in AISTATS 2023.
 
 # Quick Installation
 ## Using pip (Recommended)

@@ -1,4 +1,4 @@
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 import os
 import sys
 dir_path = os.path.dirname(os.path.realpath(__file__))

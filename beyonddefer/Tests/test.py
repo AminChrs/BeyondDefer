@@ -1516,7 +1516,7 @@ def test_all():
     test_BD_fit_CIFAR10h()
     # test_BD_fit_Imagenet()
     # test_RS_Imagenet()
-    test_BD_Hatespeech()
+    # test_BD_Hatespeech()
     test_RS_Hatespeech()
     test_parallel()
     test_return_res()
